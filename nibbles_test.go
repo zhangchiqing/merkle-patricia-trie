@@ -15,37 +15,45 @@ func TestIsNibble(t *testing.T) {
 
 func TestToPrefixed(t *testing.T) {
 	cases := []struct {
-		ns         []byte
+		ns         []Nibble
 		isLeafNode bool
-		expected   []byte
+		expected   []Nibble
 	}{
 		{
-			[]byte{1},
+			[]Nibble{1},
 			false,
-			[]byte{1, 1},
+			[]Nibble{1, 1},
 		},
 		{
-			[]byte{1, 2},
+			[]Nibble{1, 2},
 			false,
-			[]byte{0, 0, 1, 2},
+			[]Nibble{0, 0, 1, 2},
 		},
 		{
-			[]byte{1},
+			[]Nibble{1},
 			true,
-			[]byte{3, 1},
+			[]Nibble{3, 1},
 		},
 		{
-			[]byte{1, 2},
+			[]Nibble{1, 2},
 			true,
-			[]byte{2, 0, 1, 2},
+			[]Nibble{2, 0, 1, 2},
 		},
 	}
 
 	for _, c := range cases {
-		ns, err := FromBytes(c.ns)
-		require.NoError(t, err)
 		require.Equal(t,
 			c.expected,
-			ToPrefixed(ns, c.isLeafNode))
+			ToPrefixed(c.ns, c.isLeafNode))
 	}
+}
+
+func TestFromBytes(t *testing.T) {
+	// [1, 100] -> ['0x01', '0x64']
+	require.Equal(t, []Nibble{0, 1, 6, 4}, FromBytes([]byte{1, 100}))
+}
+
+func TestToBytes(t *testing.T) {
+	bytes := []byte{0, 1, 2, 3}
+	require.Equal(t, bytes, ToBytes(FromBytes(bytes)))
 }

@@ -12,21 +12,36 @@ type LeafNode struct {
 	Value []byte
 }
 
-func NewLeafNode(nibbles []byte, value []byte) (*LeafNode, error) {
-	ns, err := FromBytes(nibbles)
+func NewLeafNodeFromNibbleBytes(nibbles []byte, value []byte) (*LeafNode, error) {
+	ns, err := FromNibbleBytes(nibbles)
 	if err != nil {
-		return nil, fmt.Errorf("could not create leaf node: %w", err)
+		return nil, fmt.Errorf("could not leaf node from nibbles: %w", err)
 	}
 
+	return NewLeafNodeFromNibbles(ns, value)
+}
+
+func NewLeafNodeFromNibbles(nibbles []Nibble, value []byte) (*LeafNode, error) {
 	return &LeafNode{
-		Path:  ns,
+		Path:  nibbles,
 		Value: value,
 	}, nil
 }
 
+func NewLeafNodeFromKeyValue(key, value string) (*LeafNode, error) {
+	return NewLeafNodeFromBytes([]byte(key), []byte(value))
+}
+
+func NewLeafNodeFromBytes(key, value []byte) (*LeafNode, error) {
+	return NewLeafNodeFromNibbles(FromBytes(key), value)
+}
+
 func (l LeafNode) Hash() []byte {
-	path := ToPrefixed(l.Path, true)
-	raw := []interface{}{path, l.Value}
+	path := ToBytes(ToPrefixed(l.Path, true))
+	raw := [][]byte{path, l.Value}
+	fmt.Printf("path: %x, toPrefixed: %x, toBytes: %x\n", l.Path, ToPrefixed(l.Path, true),
+		path)
+	fmt.Printf("raw: %x\n", raw)
 	leafRLP, err := rlp.EncodeToBytes(raw)
 	if err != nil {
 		panic(err)
