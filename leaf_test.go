@@ -7,11 +7,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestIteration(t *testing.T) {
+	require.Equal(t, "01020304", fmt.Sprintf("%x", []byte{1, 2, 3, 4}))
+	require.Equal(t, "76657262", fmt.Sprintf("%x", []byte("verb")))
+
+	// "buffer to nibbles
+	require.Equal(t, "0001000200030004", fmt.Sprintf("%x", FromBytes([]byte{1, 2, 3, 4})))
+
+	// ToPrefixed
+	require.Equal(t, "02000001000200030004", fmt.Sprintf("%x", ToPrefixed(FromBytes([]byte{1, 2, 3, 4}), true)))
+
+	// ToBuffer
+	require.Equal(t, "2001020304", fmt.Sprintf("%x", ToBytes(ToPrefixed(FromBytes([]byte{1, 2, 3, 4}), true))))
+}
+
 func TestLeafNode(t *testing.T) {
-	fmt.Printf("%x, %x\n", []byte{1, 2, 3, 4}, []byte("verb"))                      // 01020304, 76657262
-	fmt.Printf("buffer to nibbles: %x\n", FromBytes([]byte{1, 2, 3, 4}))            // 0001000200030004
-	fmt.Printf("ToPrefixed: %x\n", ToPrefixed(FromBytes([]byte{1, 2, 3, 4}), true)) // 02000001000200030004
-	fmt.Printf("Tobuffer: %x\n", ToBytes(ToPrefixed(FromBytes([]byte{1, 2, 3, 4}), true)))
 	nibbles, value := []byte{1, 2, 3, 4}, []byte("verb")
 	l, err := NewLeafNodeFromBytes(nibbles, value)
 	require.NoError(t, err)

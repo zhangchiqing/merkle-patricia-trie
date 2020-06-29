@@ -37,15 +37,17 @@ func NewLeafNodeFromBytes(key, value []byte) (*LeafNode, error) {
 }
 
 func (l LeafNode) Hash() []byte {
-	path := ToBytes(ToPrefixed(l.Path, true))
-	raw := [][]byte{path, l.Value}
-	fmt.Printf("path: %x, toPrefixed: %x, toBytes: %x\n", l.Path, ToPrefixed(l.Path, true),
-		path)
-	fmt.Printf("raw: %x\n", raw)
+	raw := l.Raw()
 	leafRLP, err := rlp.EncodeToBytes(raw)
 	if err != nil {
 		panic(err)
 	}
 
 	return crypto.Keccak256(leafRLP)
+}
+
+func (l LeafNode) Raw() [][]byte {
+	path := ToBytes(ToPrefixed(l.Path, true))
+	raw := [][]byte{path, l.Value}
+	return raw
 }
