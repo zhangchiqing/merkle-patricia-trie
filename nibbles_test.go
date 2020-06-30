@@ -39,6 +39,11 @@ func TestToPrefixed(t *testing.T) {
 			true,
 			[]Nibble{2, 0, 1, 2},
 		},
+		{
+			[]Nibble{5, 0, 6},
+			true,
+			[]Nibble{3, 5, 0, 6},
+		},
 	}
 
 	for _, c := range cases {

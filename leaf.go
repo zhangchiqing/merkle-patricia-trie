@@ -46,8 +46,8 @@ func (l LeafNode) Hash() []byte {
 	return crypto.Keccak256(leafRLP)
 }
 
-func (l LeafNode) Raw() [][]byte {
+func (l LeafNode) Raw() []interface{} {
 	path := ToBytes(ToPrefixed(l.Path, true))
-	raw := [][]byte{path, l.Value}
+	raw := []interface{}{path, l.Value}
 	return raw
 }
