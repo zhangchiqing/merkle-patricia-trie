@@ -62,9 +62,7 @@ func TestLeafNode(t *testing.T) {
 	nibbles, value := []byte{1, 2, 3, 4}, []byte("verb")
 	l, err := NewLeafNodeFromBytes(nibbles, value)
 	require.NoError(t, err)
-	expected, err := fromHex("2bafd1eef58e8707569b7c70eb2f91683136910606ba7e31d07572b8b67bf5c6")
-	require.NoError(t, err)
-	require.Equal(t, expected, l.Hash())
+	require.Equal(t, "2bafd1eef58e8707569b7c70eb2f91683136910606ba7e31d07572b8b67bf5c6", fmt.Sprintf("%x", l.Hash()))
 }
 
 func TestLeafNode2(t *testing.T) {
@@ -72,7 +70,5 @@ func TestLeafNode2(t *testing.T) {
 	nibbles, value := []byte{5, 0, 6}, []byte("coin")
 	l, err := NewLeafNodeFromNibbleBytes(nibbles, value)
 	require.NoError(t, err)
-	expected, err := fromHex("c37ec985b7a88c2c62beb268750efe657c36a585beb435eb9f43b839846682ce")
-	require.NoError(t, err)
-	require.Equal(t, expected, l.Hash())
+	require.Equal(t, "c37ec985b7a88c2c62beb268750efe657c36a585beb435eb9f43b839846682ce", fmt.Sprintf("%x", l.Hash()))
 }
