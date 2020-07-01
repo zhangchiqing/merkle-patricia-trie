@@ -40,7 +40,7 @@ func (b BranchNode) Raw() []interface{} {
 	hashes := make([]interface{}, 17)
 	for i := 0; i < 16; i++ {
 		if b.Branches[i] == nil {
-			hashes[i] = []byte{}
+			hashes[i] = EmptyNodeRaw
 		} else {
 			hashes[i] = b.Branches[i].Raw()
 		}
