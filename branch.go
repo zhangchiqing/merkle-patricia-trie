@@ -20,12 +20,12 @@ func (b BranchNode) Hash() []byte {
 	return crypto.Keccak256(b.Serialize())
 }
 
-func (b *BranchNode) SetBranch(nibble int, node Node) {
-	b.Branches[nibble] = node
+func (b *BranchNode) SetBranch(nibble Nibble, node Node) {
+	b.Branches[int(nibble)] = node
 }
 
-func (b *BranchNode) RemoveBranch(nibble int) {
-	b.Branches[nibble] = nil
+func (b *BranchNode) RemoveBranch(nibble Nibble) {
+	b.Branches[int(nibble)] = nil
 }
 
 func (b *BranchNode) SetValue(value []byte) {

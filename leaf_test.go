@@ -60,8 +60,7 @@ func Test3Nibbles(t *testing.T) {
 
 func TestLeafNode(t *testing.T) {
 	nibbles, value := []byte{1, 2, 3, 4}, []byte("verb")
-	l, err := NewLeafNodeFromBytes(nibbles, value)
-	require.NoError(t, err)
+	l := NewLeafNodeFromBytes(nibbles, value)
 	require.Equal(t, "2bafd1eef58e8707569b7c70eb2f91683136910606ba7e31d07572b8b67bf5c6", fmt.Sprintf("%x", l.Hash()))
 }
 

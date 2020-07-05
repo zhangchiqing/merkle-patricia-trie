@@ -18,21 +18,21 @@ func NewLeafNodeFromNibbleBytes(nibbles []byte, value []byte) (*LeafNode, error)
 		return nil, fmt.Errorf("could not leaf node from nibbles: %w", err)
 	}
 
-	return NewLeafNodeFromNibbles(ns, value)
+	return NewLeafNodeFromNibbles(ns, value), nil
 }
 
-func NewLeafNodeFromNibbles(nibbles []Nibble, value []byte) (*LeafNode, error) {
+func NewLeafNodeFromNibbles(nibbles []Nibble, value []byte) *LeafNode {
 	return &LeafNode{
 		Path:  nibbles,
 		Value: value,
-	}, nil
+	}
 }
 
-func NewLeafNodeFromKeyValue(key, value string) (*LeafNode, error) {
+func NewLeafNodeFromKeyValue(key, value string) *LeafNode {
 	return NewLeafNodeFromBytes([]byte(key), []byte(value))
 }
 
-func NewLeafNodeFromBytes(key, value []byte) (*LeafNode, error) {
+func NewLeafNodeFromBytes(key, value []byte) *LeafNode {
 	return NewLeafNodeFromNibbles(FromBytes(key), value)
 }
 
