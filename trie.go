@@ -134,10 +134,27 @@ func (t *Trie) put(key []byte, value []byte) {
 				ext := NewExtensionNode(extNibbles, branch)
 				*nodeRef = ext
 				return
-			} else { // matched can only be == leaf.Path, can't be > leaf>Path
+			} else if matched == len(nibbles) { // matched can only be == leaf.Path, can't be > leaf>Path
 				// all matched, update value even if the value are equal
 				newLeaf := NewLeafNodeFromNibbles(leaf.Path, value)
 				*nodeRef = newLeaf
+				return
+			} else if matched < len(nibbles) {
+				// L 01020304 hello
+				// + 010203040 world
+
+				// L 01020304 hello
+				// + 010203040506 world
+				extNibbles, branchNibble, leafNibbles := nibbles[:matched], nibbles[matched], nibbles[matched+1:]
+				newLeaf := NewLeafNodeFromNibbles(leafNibbles, value)
+				branch := NewBranchNode()
+				branch.SetBranch(branchNibble, newLeaf)
+				branch.SetValue(leaf.Value)
+				ext := NewExtensionNode(extNibbles, branch)
+				*nodeRef = ext
+				return
+			} else {
+				panic("bug")
 			}
 
 			i += len(leaf.Path)
@@ -153,11 +170,6 @@ func (t *Trie) put(key []byte, value []byte) {
 
 	}
 
-	// L 01020304 hello
-	// + 010203040 world
-
-	// L 01020304 hello
-	// + 010203040506 world
 }
 
 // 01020304 hello
