@@ -97,8 +97,10 @@ func PrefixMatchedLen(node1 []Nibble, node2 []Nibble) int {
 		n1, n2 := node1[i], node2[i]
 		if n1 == n2 {
 			matched++
+		} else {
+			break
 		}
-		break
 	}
+
 	return matched
 }

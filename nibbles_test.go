@@ -62,3 +62,9 @@ func TestToBytes(t *testing.T) {
 	bytes := []byte{0, 1, 2, 3}
 	require.Equal(t, bytes, ToBytes(FromBytes(bytes)))
 }
+
+func TestPrefixMatchedLen(t *testing.T) {
+	require.Equal(t, 3, PrefixMatchedLen([]Nibble{0, 1, 2, 3}, []Nibble{0, 1, 2}))
+	require.Equal(t, 4, PrefixMatchedLen([]Nibble{0, 1, 2, 3}, []Nibble{0, 1, 2, 3}))
+	require.Equal(t, 4, PrefixMatchedLen([]Nibble{0, 1, 2, 3}, []Nibble{0, 1, 2, 3, 4}))
+}

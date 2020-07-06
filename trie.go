@@ -117,10 +117,29 @@ func (t *Trie) put(key []byte, value []byte) {
 			return
 		}
 
-		// if leaf, ok := node.(LeafNode); ok {
-		// 	matched := PrefixMatchedLen(leaf.Path, nibbles)
-		// }
-		//
+		// TODO: how to make this safer? node.(LeafNode)
+		if leaf, ok := node.(*LeafNode); ok {
+			matched := PrefixMatchedLen(leaf.Path, nibbles)
+			if matched < len(leaf.Path) {
+				// have dismatched
+				// L 01020304 hello
+				// + 010203   world
+				newLeaf := NewLeafNodeFromNibbles(leaf.Path[matched+1:], leaf.Value)
+				branch := NewBranchNode()
+				branch.SetBranch(leaf.Path[matched], newLeaf)
+				branch.SetValue(value)
+				ext := NewExtensionNode(leaf.Path[:matched], branch)
+				*nodeRef = ext
+				return
+			} else {
+				panic("not implemented")
+			}
+
+			i += len(leaf.Path)
+		}
+
+		panic("unknown type")
+
 		// if ext, ok := node.(ExtensionNode); ok {
 		// }
 		//
@@ -128,6 +147,12 @@ func (t *Trie) put(key []byte, value []byte) {
 		// }
 
 	}
+
+	// L 01020304 hello
+	// + 010203040 world
+
+	// L 01020304 hello
+	// + 010203040506 world
 }
 
 // 01020304 hello
