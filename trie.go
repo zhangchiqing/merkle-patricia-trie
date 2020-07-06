@@ -124,21 +124,26 @@ func (t *Trie) put(key []byte, value []byte) {
 				// have dismatched
 				// L 01020304 hello
 				// + 010203   world
-				newLeaf := NewLeafNodeFromNibbles(leaf.Path[matched+1:], leaf.Value)
+
+				// 01020304, 0, 4
+				extNibbles, branchNibble, leafNibbles := leaf.Path[:matched], leaf.Path[matched], leaf.Path[matched+1:]
+				newLeaf := NewLeafNodeFromNibbles(leafNibbles, leaf.Value) // not :matched+1
 				branch := NewBranchNode()
-				branch.SetBranch(leaf.Path[matched], newLeaf)
+				branch.SetBranch(branchNibble, newLeaf)
 				branch.SetValue(value)
-				ext := NewExtensionNode(leaf.Path[:matched], branch)
+				ext := NewExtensionNode(extNibbles, branch)
 				*nodeRef = ext
 				return
-			} else {
-				panic("not implemented")
+			} else { // matched can only be == leaf.Path, can't be > leaf>Path
+				// all matched, update value even if the value are equal
+				newLeaf := NewLeafNodeFromNibbles(leaf.Path, value)
+				*nodeRef = newLeaf
 			}
 
 			i += len(leaf.Path)
 		}
 
-		panic("unknown type")
+		// panic("unknown type")
 
 		// if ext, ok := node.(ExtensionNode); ok {
 		// }
