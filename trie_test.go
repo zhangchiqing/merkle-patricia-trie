@@ -9,15 +9,15 @@ import (
 func TestPut(t *testing.T) {
 	trie := NewTrie()
 	require.Equal(t, EmptyNodeHash, trie.Hash())
-	trie.put([]byte{1, 2, 3, 4}, []byte("hello"))
+	trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 	ns := NewLeafNodeFromBytes([]byte{1, 2, 3, 4}, []byte("hello"))
 	require.Equal(t, ns.Hash(), trie.Hash())
 }
 
 func TestPutLeafShorter(t *testing.T) {
 	trie := NewTrie()
-	trie.put([]byte{1, 2, 3, 4}, []byte("hello"))
-	trie.put([]byte{1, 2, 3}, []byte("world"))
+	trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
+	trie.Put([]byte{1, 2, 3}, []byte("world"))
 
 	leaf := NewLeafNodeFromNibbles([]Nibble{4}, []byte("hello"))
 
@@ -32,8 +32,8 @@ func TestPutLeafShorter(t *testing.T) {
 
 func TestPutLeafAllMatched(t *testing.T) {
 	trie := NewTrie()
-	trie.put([]byte{1, 2, 3, 4}, []byte("hello"))
-	trie.put([]byte{1, 2, 3, 4}, []byte("world"))
+	trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
+	trie.Put([]byte{1, 2, 3, 4}, []byte("world"))
 
 	ns := NewLeafNodeFromBytes([]byte{1, 2, 3, 4}, []byte("world"))
 	require.Equal(t, ns.Hash(), trie.Hash())
@@ -41,8 +41,8 @@ func TestPutLeafAllMatched(t *testing.T) {
 
 func TestPutLeafMore(t *testing.T) {
 	trie := NewTrie()
-	trie.put([]byte{1, 2, 3, 4}, []byte("hello"))
-	trie.put([]byte{1, 2, 3, 4, 5, 6}, []byte("world"))
+	trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
+	trie.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("world"))
 
 	leaf := NewLeafNodeFromNibbles([]Nibble{5, 0, 6}, []byte("world"))
 
@@ -54,3 +54,8 @@ func TestPutLeafMore(t *testing.T) {
 
 	require.Equal(t, ext.Hash(), trie.Hash())
 }
+
+// func TestPutExtLess(t *testing.T) {
+// 	trie := NewTrie()
+//
+// }
