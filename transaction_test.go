@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -60,6 +61,14 @@ func TestTransactions(t *testing.T) {
 	txs := TransactionsJSON(t)
 	tx := TransactionJSON(t)
 	require.Equal(t, tx, txs[0])
+}
+
+func TestTransactionsRLP(t *testing.T) {
+	txs := TransactionsJSON(t)
+
+	txRootHash := fmt.Sprintf("%x", types.DeriveSha(types.Transactions(txs)))
+
+	require.Equal(t, "46d78bef56d5de34736fb79a13554623d8b8f31065834f40ced97ca7c1708185", txRootHash)
 }
 
 func TransactionJSON(t *testing.T) *types.Transaction {
