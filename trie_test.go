@@ -55,7 +55,17 @@ func TestPutLeafMore(t *testing.T) {
 	require.Equal(t, ext.Hash(), trie.Hash())
 }
 
-// func TestPutExtLess(t *testing.T) {
-// 	trie := NewTrie()
-//
-// }
+func TestPutOrder(t *testing.T) {
+	trie1, trie2 := NewTrie(), NewTrie()
+
+	trie1.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("world"))
+	trie1.Put([]byte{1, 2, 3, 4}, []byte("hello"))
+
+	trie2.Put([]byte{1, 2, 3, 4}, []byte("hello"))
+	trie2.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("world"))
+
+	require.Equal(t, trie1.Hash(), trie2.Hash())
+}
+
+func TestPutExt(t *testing.T) {
+}
