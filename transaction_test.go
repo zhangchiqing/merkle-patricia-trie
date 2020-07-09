@@ -13,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/require"
 )
 
@@ -69,6 +70,8 @@ func TestTransactionsRLP(t *testing.T) {
 	txRootHash := fmt.Sprintf("%x", types.DeriveSha(types.Transactions(txs)))
 
 	require.Equal(t, "46d78bef56d5de34736fb79a13554623d8b8f31065834f40ced97ca7c1708185", txRootHash)
+
+	require.Equal(t, "f2ec1bbd7b3db9d77f8b350a77fbaba7c4289010d7652930eeea666f718fa9d8", fmt.Sprintf("%x", types.DeriveSha(types.Transactions{txs[0]})))
 }
 
 func TransactionJSON(t *testing.T) *types.Transaction {
@@ -106,4 +109,51 @@ func FromEthTransaction(t *types.Transaction) *Transaction {
 		R:            r,
 		S:            s,
 	}
+}
+
+func TestTrieWithOneTx(t *testing.T) {
+	key, err := rlp.EncodeToBytes(uint(0))
+	require.NoError(t, err)
+
+	tx := TransactionJSON(t)
+
+	transaction := FromEthTransaction(tx)
+	rlp, err := transaction.GetRLP()
+	require.NoError(t, err)
+
+	trie := NewTrie()
+	trie.Put(key, rlp)
+
+	txRootHash := fmt.Sprintf("%x", types.DeriveSha(types.Transactions{tx}))
+	require.Equal(t, txRootHash, fmt.Sprintf("%x", trie.Hash()))
+}
+
+func TestTrieWithTwoTxs(t *testing.T) {
+
+	txs := TransactionsJSON(t)
+	txs = txs[:2]
+
+	fmt.Printf("tx0: %x\n", types.Transactions(txs).GetRlp(0))
+	fmt.Printf("tx1: %x\n", types.Transactions(txs).GetRlp(1))
+	trie := NewTrie()
+	for i, tx := range txs {
+		key, err := rlp.EncodeToBytes(uint(i))
+		require.NoError(t, err)
+
+		fmt.Printf("key %v: %x\n", i, key)
+		transaction := FromEthTransaction(tx)
+
+		rlp, err := transaction.GetRLP()
+		require.NoError(t, err)
+
+		trie.Put(key, rlp)
+	}
+
+	key, err := rlp.EncodeToBytes(uint(0))
+	require.NoError(t, err)
+	value, found := trie.Get(key)
+	fmt.Printf("value: %x, found: %v\n", value, found)
+
+	txRootHash := fmt.Sprintf("%x", types.DeriveSha(types.Transactions(txs)))
+	require.Equal(t, txRootHash, fmt.Sprintf("%x", trie.Hash()))
 }

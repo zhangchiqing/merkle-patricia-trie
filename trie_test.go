@@ -66,6 +66,3 @@ func TestPutOrder(t *testing.T) {
 
 	require.Equal(t, trie1.Hash(), trie2.Hash())
 }
-
-func TestPutExt(t *testing.T) {
-}

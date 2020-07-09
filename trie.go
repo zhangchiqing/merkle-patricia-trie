@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 type Trie struct {
 	root Node
 }
@@ -18,12 +20,16 @@ func (t *Trie) Hash() []byte {
 func (t *Trie) Get(key []byte) ([]byte, bool) {
 	node := t.root
 	nibbles := FromBytes(key)
-	for i := 0; i < len(nibbles); {
+	fmt.Printf("nibbles: %v\n", nibbles)
+	for len(nibbles) > 0 {
+		fmt.Printf("get nibble: %v\n", nibbles[0])
 		if IsEmptyNode(node) {
+			fmt.Printf("empty node: %v\n", node)
 			return nil, false
 		}
 
 		if leaf, ok := node.(*LeafNode); ok {
+			fmt.Printf("leaf node: %v\n", leaf)
 			matched := PrefixMatchedLen(leaf.Path, nibbles)
 			if matched != len(leaf.Path) || matched != len(nibbles) {
 				return nil, false
@@ -31,7 +37,8 @@ func (t *Trie) Get(key []byte) ([]byte, bool) {
 			return leaf.Value, true
 		}
 
-		if branch, ok := node.(BranchNode); ok {
+		if branch, ok := node.(*BranchNode); ok {
+			fmt.Printf("branch node: %v\n", branch)
 			if len(nibbles) == 0 {
 				return branch.Value, branch.HasValue()
 			}
@@ -39,11 +46,11 @@ func (t *Trie) Get(key []byte) ([]byte, bool) {
 			b, remaining := nibbles[0], nibbles[1:]
 			nibbles = remaining
 			node = branch.Branches[b]
-			i++
 			continue
 		}
 
-		if ext, ok := node.(ExtensionNode); ok {
+		if ext, ok := node.(*ExtensionNode); ok {
+			fmt.Printf("ext node: %v\n", ext)
 			matched := PrefixMatchedLen(ext.Path, nibbles)
 			// E 01020304
 			//   010203
@@ -53,13 +60,18 @@ func (t *Trie) Get(key []byte) ([]byte, bool) {
 
 			nibbles = nibbles[matched:]
 			node = ext.Next
-			i += matched
 			continue
 		}
+
+		panic("not found")
 	}
 
 	return nil, false
 }
+
+// 80 "aa"
+// 01 "bb"
+// 0
 
 // In general, when inserting into a MPT
 // if you stopped at an empty node, you add a new leaf node with the remaining path and replace the empty node with the hash of the new leaf node
@@ -70,14 +82,17 @@ func (t *Trie) Put(key []byte, value []byte) {
 	// keeping trace of the parent node
 	node := &t.root
 	nibbles := FromBytes(key)
+	fmt.Printf("put nibbles: %v, values: %x\n", nibbles, value)
 	for i := 0; i < len(nibbles); {
 		if IsEmptyNode(*node) {
+			fmt.Printf("i: %v, nibbles[i]: %v, put empty node: %v\n", i, nibbles[i], node)
 			leaf := NewLeafNodeFromBytes(key[i:], value)
 			*node = leaf
 			return
 		}
 
 		if leaf, ok := (*node).(*LeafNode); ok {
+			fmt.Printf("i: %v, nibbles[i]: %v, put leaf node: %v\n", i, nibbles[i], leaf)
 			matched := PrefixMatchedLen(leaf.Path, nibbles)
 			if matched < len(leaf.Path) {
 				// have dismatched
@@ -90,8 +105,14 @@ func (t *Trie) Put(key []byte, value []byte) {
 				branch := NewBranchNode()
 				branch.SetBranch(branchNibble, newLeaf)
 				branch.SetValue(value)
-				ext := NewExtensionNode(extNibbles, branch)
-				*node = ext
+				if matched > 0 {
+					// create an extension node for the shared nibbles
+					ext := NewExtensionNode(extNibbles, branch)
+					*node = ext
+				} else {
+					// when there is nothing matched, there is no need to keep the extension node
+					*node = branch
+				}
 				return
 			} else if matched == len(nibbles) { // matched can only be == leaf.Path, can't be > leaf.Path
 				// all matched, update value even if the value are equal
@@ -117,7 +138,8 @@ func (t *Trie) Put(key []byte, value []byte) {
 			}
 		}
 
-		if branch, ok := (*node).(BranchNode); ok {
+		if branch, ok := (*node).(*BranchNode); ok {
+			fmt.Printf("i: %v, nibbles[i]: %v, put branch node: %v\n", i, nibbles[i], branch)
 			if len(nibbles) == 0 {
 				branch.SetValue(value)
 				return
@@ -134,7 +156,8 @@ func (t *Trie) Put(key []byte, value []byte) {
 		// B 0 hello
 		// L 506 world
 		// + 010203 good
-		if ext, ok := (*node).(ExtensionNode); ok {
+		if ext, ok := (*node).(*ExtensionNode); ok {
+			fmt.Printf("i: %v, nibbles[i]: %v, put ext node: %v\n", i, nibbles[i], ext)
 			matched := PrefixMatchedLen(ext.Path, nibbles)
 			if matched < len(ext.Path) {
 				// E 01020304
