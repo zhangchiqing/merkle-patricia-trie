@@ -83,16 +83,17 @@ func (t *Trie) Put(key []byte, value []byte) {
 	node := &t.root
 	nibbles := FromBytes(key)
 	fmt.Printf("put nibbles: %v, values: %x\n", nibbles, value)
-	for i := 0; i < len(nibbles); {
+	for len(nibbles) > 0 {
+		fmt.Printf("put cur nibble: %v\n", nibbles[0])
 		if IsEmptyNode(*node) {
-			fmt.Printf("i: %v, nibbles[i]: %v, put empty node: %v\n", i, nibbles[i], node)
-			leaf := NewLeafNodeFromBytes(key[i:], value)
+			fmt.Printf("put empty node: %v\n", node)
+			leaf := NewLeafNodeFromNibbles(nibbles, value)
 			*node = leaf
 			return
 		}
 
 		if leaf, ok := (*node).(*LeafNode); ok {
-			fmt.Printf("i: %v, nibbles[i]: %v, put leaf node: %v\n", i, nibbles[i], leaf)
+			fmt.Printf("put leaf node: %v\n", leaf)
 			matched := PrefixMatchedLen(leaf.Path, nibbles)
 			if matched < len(leaf.Path) {
 				// have dismatched
@@ -139,7 +140,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 		}
 
 		if branch, ok := (*node).(*BranchNode); ok {
-			fmt.Printf("i: %v, nibbles[i]: %v, put branch node: %v\n", i, nibbles[i], branch)
+			fmt.Printf("put branch node: %v\n", branch)
 			if len(nibbles) == 0 {
 				branch.SetValue(value)
 				return
@@ -148,7 +149,6 @@ func (t *Trie) Put(key []byte, value []byte) {
 			b, remaining := nibbles[0], nibbles[1:]
 			nibbles = remaining
 			node = &branch.Branches[b]
-			i++
 			continue
 		}
 
@@ -157,7 +157,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 		// L 506 world
 		// + 010203 good
 		if ext, ok := (*node).(*ExtensionNode); ok {
-			fmt.Printf("i: %v, nibbles[i]: %v, put ext node: %v\n", i, nibbles[i], ext)
+			fmt.Printf("put ext node: %v\n", ext)
 			matched := PrefixMatchedLen(ext.Path, nibbles)
 			if matched < len(ext.Path) {
 				// E 01020304
@@ -187,7 +187,6 @@ func (t *Trie) Put(key []byte, value []byte) {
 
 			nibbles = nibbles[:matched]
 			node = &ext.Next
-			i += matched
 			continue
 		}
 
