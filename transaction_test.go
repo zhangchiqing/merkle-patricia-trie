@@ -152,8 +152,28 @@ func TestTrieWithTwoTxs(t *testing.T) {
 	key, err := rlp.EncodeToBytes(uint(0))
 	require.NoError(t, err)
 	value, found := trie.Get(key)
-	fmt.Printf("value: %x, found: %v\n", value, found)
+	fmt.Printf("==0 value: %x, found: %v\n", value, found)
+
+	key, err = rlp.EncodeToBytes(uint(1))
+	require.NoError(t, err)
+	value, found = trie.Get(key)
+	fmt.Printf("==1 value: %x, found: %v\n", value, found)
 
 	txRootHash := fmt.Sprintf("%x", types.DeriveSha(types.Transactions(txs)))
 	require.Equal(t, txRootHash, fmt.Sprintf("%x", trie.Hash()))
+}
+
+func TestTrieWithHash(t *testing.T) {
+	trie := NewTrie()
+	key0, err := rlp.EncodeToBytes(uint(0))
+	require.NoError(t, err)
+	key1, err := rlp.EncodeToBytes(uint(1))
+	require.NoError(t, err)
+	tx0, err := hex.DecodeString("f9010c820144853fcf6e43c5830493e094897c3dec007e1bcd7b8dcc1f304c2246eea6853780b8a46b038dca0000000000000000000000004f2604aac91114ae3b3d0be485d407d02b24480b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000147d35700000000000000000000000000000000000000000000000000000000003b9ac9ff0000000000000000000000000000000000000000000000000000000000b5bc4d26a0d6537ab8b4f5161b07a53265b1fb7f73d84745911e6eb9ca11613a26ccf0c2f4a055b26eb0b1530a0da9ea1a29a322e2b6db0e374b313a0be397a598bda48e73b3")
+	require.NoError(t, err)
+	tx1, err := hex.DecodeString("f8a91c85126a21a08082a10594dac17f958d2ee523a2206206994597c13d831ec780b844a9059cbb000000000000000000000000cb9e24937d393373790a1e31af300e05a501d40c00000000000000000000000000000000000000000000000000000006a79eb58025a017ba02f156b099df4a73b1f2183943dc23d5deb24e0a50fb5ea33b90bff5f6cba06cff7c6c51c50b50c2e727aa31729e261ea9b92672a69863a89fe72f1968262a")
+	require.NoError(t, err)
+	trie.Put(key0, tx0)
+	trie.Put(key1, tx1)
+	require.Equal(t, "88796e4f9cfeca7b53f666e3103a1ba981b9445b78bf687788e1ad8976843d83", fmt.Sprintf("%x", trie.Hash()))
 }

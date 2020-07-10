@@ -29,7 +29,7 @@ func (t *Trie) Get(key []byte) ([]byte, bool) {
 		}
 
 		if leaf, ok := node.(*LeafNode); ok {
-			fmt.Printf("leaf node: %v\n", leaf)
+			fmt.Printf("==>leaf node: %v, %x, hash: %x\n", leaf.Path, leaf.Value, leaf.Hash())
 			matched := PrefixMatchedLen(leaf.Path, nibbles)
 			if matched != len(leaf.Path) || matched != len(nibbles) {
 				return nil, false
@@ -93,50 +93,53 @@ func (t *Trie) Put(key []byte, value []byte) {
 		}
 
 		if leaf, ok := (*node).(*LeafNode); ok {
-			fmt.Printf("put leaf node: %v\n", leaf)
+			fmt.Printf("put leaf node: %x, %x\n", leaf.Path, leaf.Value)
 			matched := PrefixMatchedLen(leaf.Path, nibbles)
+
+			if matched == len(nibbles) && matched == len(leaf.Path) {
+				// all matched, update value even if the value are equal
+				newLeaf := NewLeafNodeFromNibbles(leaf.Path, value)
+				*node = newLeaf
+				return
+			}
+
+			branch := NewBranchNode()
+			if matched > 0 {
+				if matched == len(leaf.Path) {
+					branch.SetValue(value)
+				}
+
+				// create an extension node for the shared nibbles
+				ext := NewExtensionNode(leaf.Path[:matched], branch)
+				*node = ext
+			} else {
+				// when there is nothing matched, there is no need to keep the extension node
+				*node = branch
+			}
+
 			if matched < len(leaf.Path) {
 				// have dismatched
 				// L 01020304 hello
 				// + 010203   world
 
 				// 01020304, 0, 4
-				extNibbles, branchNibble, leafNibbles := leaf.Path[:matched], leaf.Path[matched], leaf.Path[matched+1:]
+				branchNibble, leafNibbles := leaf.Path[matched], leaf.Path[matched+1:]
 				newLeaf := NewLeafNodeFromNibbles(leafNibbles, leaf.Value) // not :matched+1
-				branch := NewBranchNode()
 				branch.SetBranch(branchNibble, newLeaf)
-				branch.SetValue(value)
-				if matched > 0 {
-					// create an extension node for the shared nibbles
-					ext := NewExtensionNode(extNibbles, branch)
-					*node = ext
-				} else {
-					// when there is nothing matched, there is no need to keep the extension node
-					*node = branch
-				}
-				return
-			} else if matched == len(nibbles) { // matched can only be == leaf.Path, can't be > leaf.Path
-				// all matched, update value even if the value are equal
-				newLeaf := NewLeafNodeFromNibbles(leaf.Path, value)
-				*node = newLeaf
-				return
-			} else if matched < len(nibbles) {
+			}
+
+			if matched < len(nibbles) {
 				// L 01020304 hello
 				// + 010203040 world
 
 				// L 01020304 hello
 				// + 010203040506 world
-				extNibbles, branchNibble, leafNibbles := nibbles[:matched], nibbles[matched], nibbles[matched+1:]
+				branchNibble, leafNibbles := nibbles[matched], nibbles[matched+1:]
 				newLeaf := NewLeafNodeFromNibbles(leafNibbles, value)
-				branch := NewBranchNode()
 				branch.SetBranch(branchNibble, newLeaf)
-				branch.SetValue(leaf.Value)
-				ext := NewExtensionNode(extNibbles, branch)
-				*node = ext
-				return
-			} else {
-				panic("bug")
 			}
+
+			return
 		}
 
 		if branch, ok := (*node).(*BranchNode); ok {

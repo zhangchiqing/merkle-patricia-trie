@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -42,7 +44,7 @@ func (b BranchNode) Raw() []interface{} {
 		if b.Branches[i] == nil {
 			hashes[i] = EmptyNodeRaw
 		} else {
-			hashes[i] = b.Branches[i].Raw()
+			hashes[i] = b.Branches[i].Hash()
 		}
 	}
 
@@ -52,8 +54,10 @@ func (b BranchNode) Raw() []interface{} {
 
 func (b BranchNode) Serialize() []byte {
 	raw := b.Raw()
+	fmt.Printf("branch raw: %v\n", raw)
 
 	branchRLP, err := rlp.EncodeToBytes(raw)
+	fmt.Printf("branch rlp: %x\n", branchRLP)
 	if err != nil {
 		panic(err)
 	}
