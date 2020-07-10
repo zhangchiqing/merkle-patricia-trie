@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
 )
@@ -64,10 +62,8 @@ func (b BranchNode) Raw() []interface{} {
 
 func (b BranchNode) Serialize() []byte {
 	raw := b.Raw()
-	fmt.Printf("branch raw: %v\n", raw)
 
 	branchRLP, err := rlp.EncodeToBytes(raw)
-	fmt.Printf("branch rlp: %x\n", branchRLP)
 	if err != nil {
 		panic(err)
 	}

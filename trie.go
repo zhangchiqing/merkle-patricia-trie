@@ -1,7 +1,5 @@
 package main
 
-import "fmt"
-
 type Trie struct {
 	root Node
 }
@@ -20,21 +18,12 @@ func (t *Trie) Hash() []byte {
 func (t *Trie) Get(key []byte) ([]byte, bool) {
 	node := t.root
 	nibbles := FromBytes(key)
-	fmt.Printf("nibbles: %v\n", nibbles)
 	for {
-		if len(nibbles) > 0 {
-			fmt.Printf("get nibble: %v\n", nibbles[0])
-		} else {
-			fmt.Printf("get empty nibble\n")
-		}
-
 		if IsEmptyNode(node) {
-			fmt.Printf("empty node: %v\n", node)
 			return nil, false
 		}
 
 		if leaf, ok := node.(*LeafNode); ok {
-			fmt.Printf("==>leaf node: %v, %x, hash: %x\n", leaf.Path, leaf.Value, leaf.Hash())
 			matched := PrefixMatchedLen(leaf.Path, nibbles)
 			if matched != len(leaf.Path) || matched != len(nibbles) {
 				return nil, false
@@ -43,7 +32,6 @@ func (t *Trie) Get(key []byte) ([]byte, bool) {
 		}
 
 		if branch, ok := node.(*BranchNode); ok {
-			fmt.Printf("branch node: %v\n", branch)
 			if len(nibbles) == 0 {
 				return branch.Value, branch.HasValue()
 			}
@@ -55,9 +43,7 @@ func (t *Trie) Get(key []byte) ([]byte, bool) {
 		}
 
 		if ext, ok := node.(*ExtensionNode); ok {
-			fmt.Printf("ext node: %v\n", ext)
 			matched := PrefixMatchedLen(ext.Path, nibbles)
-			fmt.Printf("ext match: %v, %v\n", nibbles, matched)
 			// E 01020304
 			//   010203
 			if matched < len(ext.Path) {
@@ -66,7 +52,6 @@ func (t *Trie) Get(key []byte) ([]byte, bool) {
 
 			nibbles = nibbles[matched:]
 			node = ext.Next
-			fmt.Printf("ext next: %v, %v\n", nibbles, node)
 			continue
 		}
 
@@ -87,18 +72,14 @@ func (t *Trie) Put(key []byte, value []byte) {
 	// keeping trace of the parent node
 	node := &t.root
 	nibbles := FromBytes(key)
-	fmt.Printf("put nibbles: %v, values: %x\n", nibbles, value)
 	for len(nibbles) > 0 {
-		fmt.Printf("put cur nibble: %v\n", nibbles[0])
 		if IsEmptyNode(*node) {
-			fmt.Printf("put empty node: %v\n", node)
 			leaf := NewLeafNodeFromNibbles(nibbles, value)
 			*node = leaf
 			return
 		}
 
 		if leaf, ok := (*node).(*LeafNode); ok {
-			fmt.Printf("put leaf node: %x, %x\n", leaf.Path, leaf.Value)
 			matched := PrefixMatchedLen(leaf.Path, nibbles)
 
 			// if all matched, update value even if the value are equal
@@ -155,7 +136,6 @@ func (t *Trie) Put(key []byte, value []byte) {
 		}
 
 		if branch, ok := (*node).(*BranchNode); ok {
-			fmt.Printf("put branch node: %v\n", branch)
 			if len(nibbles) == 0 {
 				branch.SetValue(value)
 				return
@@ -172,7 +152,6 @@ func (t *Trie) Put(key []byte, value []byte) {
 		// L 506 world
 		// + 010203 good
 		if ext, ok := (*node).(*ExtensionNode); ok {
-			fmt.Printf("put ext node: %v\n", ext)
 			matched := PrefixMatchedLen(ext.Path, nibbles)
 			if matched < len(ext.Path) {
 				// E 01020304

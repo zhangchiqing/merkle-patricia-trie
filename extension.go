@@ -24,7 +24,11 @@ func (e ExtensionNode) Hash() []byte {
 func (e ExtensionNode) Raw() []interface{} {
 	hashes := make([]interface{}, 2)
 	hashes[0] = ToBytes(ToPrefixed(e.Path, false))
-	hashes[1] = e.Next.Raw()
+	if len(e.Next.Serialize()) >= 32 {
+		hashes[1] = e.Next.Hash()
+	} else {
+		hashes[1] = e.Next.Raw()
+	}
 	return hashes
 }
 

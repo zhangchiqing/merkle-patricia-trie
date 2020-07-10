@@ -177,3 +177,23 @@ func TestTrieWithHash(t *testing.T) {
 	trie.Put(key1, tx1)
 	require.Equal(t, "88796e4f9cfeca7b53f666e3103a1ba981b9445b78bf687788e1ad8976843d83", fmt.Sprintf("%x", trie.Hash()))
 }
+
+func TestTrieWithBlockTxs(t *testing.T) {
+	txs := TransactionsJSON(t)
+
+	trie := NewTrie()
+	for i, tx := range txs {
+		key, err := rlp.EncodeToBytes(uint(i))
+		require.NoError(t, err)
+
+		transaction := FromEthTransaction(tx)
+
+		rlp, err := transaction.GetRLP()
+		require.NoError(t, err)
+
+		trie.Put(key, rlp)
+	}
+
+	txRootHash := fmt.Sprintf("%x", types.DeriveSha(types.Transactions(txs)))
+	require.Equal(t, txRootHash, fmt.Sprintf("%x", trie.Hash()))
+}
