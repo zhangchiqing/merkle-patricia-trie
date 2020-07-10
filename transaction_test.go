@@ -191,6 +191,7 @@ func TestTrieWithBlockTxs(t *testing.T) {
 		rlp, err := transaction.GetRLP()
 		require.NoError(t, err)
 
+		fmt.Printf("key: %x, value: %x\n", key, rlp)
 		trie.Put(key, rlp)
 	}
 

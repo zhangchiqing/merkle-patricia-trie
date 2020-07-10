@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type BranchNode struct {
@@ -43,12 +42,12 @@ func (b BranchNode) Raw() []interface{} {
 			hashes[i] = EmptyNodeRaw
 		} else {
 			node := b.Branches[i]
-			if len(node.Serialize()) >= 32 {
+			if len(Serialize(node)) >= 32 {
 				hashes[i] = node.Hash()
 			} else {
 				// if node can be serialized to less than 32 bits, then
-				// use Serialized directly
-				// has to be ">=", rather than ">",
+				// use Serialized directly.
+				// it has to be ">=", rather than ">",
 				// so that when deserialized, the content can be distinguished
 				// by length
 				hashes[i] = node.Raw()
@@ -61,14 +60,7 @@ func (b BranchNode) Raw() []interface{} {
 }
 
 func (b BranchNode) Serialize() []byte {
-	raw := b.Raw()
-
-	branchRLP, err := rlp.EncodeToBytes(raw)
-	if err != nil {
-		panic(err)
-	}
-
-	return branchRLP
+	return Serialize(b)
 }
 
 func (b BranchNode) HasValue() bool {

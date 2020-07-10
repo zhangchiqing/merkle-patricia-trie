@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type LeafNode struct {
@@ -47,11 +46,5 @@ func (l LeafNode) Raw() []interface{} {
 }
 
 func (l LeafNode) Serialize() []byte {
-	raw := l.Raw()
-	leafRLP, err := rlp.EncodeToBytes(raw)
-	if err != nil {
-		panic(err)
-	}
-
-	return leafRLP
+	return Serialize(l)
 }
