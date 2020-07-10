@@ -1,10 +1,27 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestPut2(t *testing.T) {
+	trie := NewTrie()
+	trie.Put([]byte{1, 2, 3, 4}, []byte("verb"))
+	trie.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("coin"))
+
+	verb, ok := trie.Get([]byte{1, 2, 3, 4})
+	require.True(t, ok)
+	require.Equal(t, []byte("verb"), verb)
+
+	coin, ok := trie.Get([]byte{1, 2, 3, 4, 5, 6})
+	require.True(t, ok)
+	require.Equal(t, []byte("coin"), coin)
+
+	require.Equal(t, "64d67c5318a714d08de6958c0e63a05522642f3f1087c6fd68a97837f203d359", fmt.Sprintf("%x", trie.Hash()))
+}
 
 func TestPut(t *testing.T) {
 	trie := NewTrie()

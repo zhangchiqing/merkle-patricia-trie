@@ -21,8 +21,13 @@ func (t *Trie) Get(key []byte) ([]byte, bool) {
 	node := t.root
 	nibbles := FromBytes(key)
 	fmt.Printf("nibbles: %v\n", nibbles)
-	for len(nibbles) > 0 {
-		fmt.Printf("get nibble: %v\n", nibbles[0])
+	for {
+		if len(nibbles) > 0 {
+			fmt.Printf("get nibble: %v\n", nibbles[0])
+		} else {
+			fmt.Printf("get empty nibble\n")
+		}
+
 		if IsEmptyNode(node) {
 			fmt.Printf("empty node: %v\n", node)
 			return nil, false
@@ -52,6 +57,7 @@ func (t *Trie) Get(key []byte) ([]byte, bool) {
 		if ext, ok := node.(*ExtensionNode); ok {
 			fmt.Printf("ext node: %v\n", ext)
 			matched := PrefixMatchedLen(ext.Path, nibbles)
+			fmt.Printf("ext match: %v, %v\n", nibbles, matched)
 			// E 01020304
 			//   010203
 			if matched < len(ext.Path) {
@@ -60,13 +66,12 @@ func (t *Trie) Get(key []byte) ([]byte, bool) {
 
 			nibbles = nibbles[matched:]
 			node = ext.Next
+			fmt.Printf("ext next: %v, %v\n", nibbles, node)
 			continue
 		}
 
 		panic("not found")
 	}
-
-	return nil, false
 }
 
 // 80 "aa"
@@ -96,19 +101,24 @@ func (t *Trie) Put(key []byte, value []byte) {
 			fmt.Printf("put leaf node: %x, %x\n", leaf.Path, leaf.Value)
 			matched := PrefixMatchedLen(leaf.Path, nibbles)
 
+			// if all matched, update value even if the value are equal
 			if matched == len(nibbles) && matched == len(leaf.Path) {
-				// all matched, update value even if the value are equal
 				newLeaf := NewLeafNodeFromNibbles(leaf.Path, value)
 				*node = newLeaf
 				return
 			}
 
 			branch := NewBranchNode()
-			if matched > 0 {
-				if matched == len(leaf.Path) {
-					branch.SetValue(value)
-				}
+			if matched == len(leaf.Path) {
+				branch.SetValue(leaf.Value)
+			}
 
+			if matched == len(nibbles) {
+				branch.SetValue(value)
+			}
+
+			// if there is matched nibbles, an extension node will be created
+			if matched > 0 {
 				// create an extension node for the shared nibbles
 				ext := NewExtensionNode(leaf.Path[:matched], branch)
 				*node = ext

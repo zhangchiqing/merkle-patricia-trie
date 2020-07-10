@@ -44,7 +44,18 @@ func (b BranchNode) Raw() []interface{} {
 		if b.Branches[i] == nil {
 			hashes[i] = EmptyNodeRaw
 		} else {
-			hashes[i] = b.Branches[i].Hash()
+			node := b.Branches[i]
+			hashes[i] = node.Hash()
+			// if len(node.Serialize()) >= 32 {
+			// 	hashes[i] = node.Hash()
+			// } else {
+			// 	// if node can be serialized to less than 32 bits, then
+			// 	// use Serialized directly
+			// 	// has to be ">=", rather than ">",
+			// 	// so that when deserialized, the content can be distinguished
+			// 	// by length
+			// 	hashes[i] = node.Raw()
+			// }
 		}
 	}
 

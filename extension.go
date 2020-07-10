@@ -31,10 +31,10 @@ func (e ExtensionNode) Raw() []interface{} {
 func (e ExtensionNode) Serialize() []byte {
 	raw := e.Raw()
 
-	branchRLP, err := rlp.EncodeToBytes(raw)
+	extRLP, err := rlp.EncodeToBytes(raw)
 	if err != nil {
 		panic(err)
 	}
 
-	return branchRLP
+	return extRLP
 }
