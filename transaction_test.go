@@ -196,5 +196,17 @@ func TestTrieWithBlockTxs(t *testing.T) {
 	}
 
 	txRootHash := fmt.Sprintf("%x", types.DeriveSha(types.Transactions(txs)))
+
+	root, ok := trie.root.(*BranchNode)
+	require.True(t, ok)
+	branch, ok := root.Branches[0].(*BranchNode)
+	require.True(t, ok)
+	leaf, ok := branch.Branches[2].(*LeafNode)
+	require.True(t, ok)
+	fmt.Printf("root hash: %x\n", root.Hash())
+	fmt.Printf("branch hash: %x\n", branch.Hash())
+	fmt.Printf("branch: %v\n", branch)
+	fmt.Printf("leaf hash: %x\n", leaf.Hash())
+
 	require.Equal(t, txRootHash, fmt.Sprintf("%x", trie.Hash()))
 }

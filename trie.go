@@ -72,7 +72,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 	// keeping trace of the parent node
 	node := &t.root
 	nibbles := FromBytes(key)
-	for len(nibbles) > 0 {
+	for {
 		if IsEmptyNode(*node) {
 			leaf := NewLeafNodeFromNibbles(nibbles, value)
 			*node = leaf
