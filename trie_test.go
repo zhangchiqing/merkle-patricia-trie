@@ -7,7 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPut2(t *testing.T) {
+func hexEqual(t *testing.T, hex string, bytes []byte) {
+	require.Equal(t, hex, fmt.Sprintf("%x", bytes))
+}
+
+func TestPut2Pairs(t *testing.T) {
 	trie := NewTrie()
 	trie.Put([]byte{1, 2, 3, 4}, []byte("verb"))
 	trie.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("coin"))
@@ -20,7 +24,18 @@ func TestPut2(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, []byte("coin"), coin)
 
-	require.Equal(t, "64d67c5318a714d08de6958c0e63a05522642f3f1087c6fd68a97837f203d359", fmt.Sprintf("%x", trie.Hash()))
+	fmt.Printf("%T\n", trie.root)
+	ext, ok := trie.root.(*ExtensionNode)
+	require.True(t, ok)
+	branch, ok := ext.Next.(*BranchNode)
+	require.True(t, ok)
+	leaf, ok := branch.Branches[0].(*LeafNode)
+	require.True(t, ok)
+
+	hexEqual(t, "c37ec985b7a88c2c62beb268750efe657c36a585beb435eb9f43b839846682ce", leaf.Hash())
+	hexEqual(t, "ddc882350684636f696e8080808080808080808080808080808476657262", branch.Serialize())
+	hexEqual(t, "d757709f08f7a81da64a969200e59ff7e6cd6b06674c3f668ce151e84298aa79", branch.Hash())
+	hexEqual(t, "64d67c5318a714d08de6958c0e63a05522642f3f1087c6fd68a97837f203d359", ext.Hash())
 }
 
 func TestPut(t *testing.T) {

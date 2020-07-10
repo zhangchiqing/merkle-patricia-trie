@@ -109,6 +109,8 @@ func (t *Trie) Put(key []byte, value []byte) {
 			}
 
 			branch := NewBranchNode()
+			// if matched some nibbles, check if matches either all remaining nibbles
+			// or all leaf nibbles
 			if matched == len(leaf.Path) {
 				branch.SetValue(leaf.Value)
 			}
@@ -123,7 +125,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 				ext := NewExtensionNode(leaf.Path[:matched], branch)
 				*node = ext
 			} else {
-				// when there is nothing matched, there is no need to keep the extension node
+				// when there no matched nibble, there is no need to keep the extension node
 				*node = branch
 			}
 
