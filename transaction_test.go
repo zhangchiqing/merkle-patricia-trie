@@ -58,16 +58,6 @@ func TestTransactionRLP(t *testing.T) {
 	require.Equal(t, b.Bytes(), rlp)
 }
 
-// func TestTransactionsRLP(t *testing.T) {
-// 	txs := TransactionsJSON(t)
-//
-// 	txRootHash := fmt.Sprintf("%x", types.DeriveSha(types.Transactions(txs)))
-//
-// 	require.Equal(t, "46d78bef56d5de34736fb79a13554623d8b8f31065834f40ced97ca7c1708185", txRootHash)
-//
-// 	require.Equal(t, "f2ec1bbd7b3db9d77f8b350a77fbaba7c4289010d7652930eeea666f718fa9d8", fmt.Sprintf("%x", types.DeriveSha(types.Transactions{txs[0]})))
-// }
-
 func TransactionJSON(t *testing.T) *types.Transaction {
 	jsonFile, err := os.Open("transaction.json")
 	defer jsonFile.Close()
@@ -174,7 +164,6 @@ func TestTrieWithHash(t *testing.T) {
 
 func TestTrieWithBlockTxs(t *testing.T) {
 	txs := TransactionsJSON(t)
-	txs = txs[:144]
 
 	trie := NewTrie()
 	for i, tx := range txs {
@@ -196,7 +185,7 @@ func TestTrieWithBlockTxs(t *testing.T) {
 func Test130Items(t *testing.T) {
 	trie := NewTrie()
 	value, _ := hex.DecodeString("80")
-	for i := 0; i < 145; i++ {
+	for i := 0; i < 250; i++ {
 		key, err := rlp.EncodeToBytes(uint(i))
 		require.NoError(t, err)
 		trie.Put(key, value)
@@ -204,21 +193,4 @@ func Test130Items(t *testing.T) {
 	}
 
 	fmt.Printf("root: %x\n", trie.Hash())
-	n0, _ := trie.root.(*BranchNode)
-	n1, _ := n0.Branches[8].(*BranchNode)
-	n2, _ := n1.Branches[1].(*BranchNode)
-	n3, _ := n2.Branches[9].(*LeafNode)
-	// key, _ := hex.DecodeString("8190")
-	// v, ok := trie.Get(key)
-	// require.True(t, ok)
-	fmt.Printf("n0: %x\n", n0.Hash())
-	fmt.Printf("n1: %x\n", n1.Hash())
-	fmt.Printf("n2: %x\n", n2.Hash())
-	fmt.Printf("n3: %x\n", n3.Hash())
-	fmt.Printf("n0: %v\n", n0)
-	fmt.Printf("n1: %v\n", n1)
-	fmt.Printf("n2: %v\n", n2)
-	fmt.Printf("n3: %v\n", n3)
-	// // fmt.Printf("value: %v, n4: %v\n", v, n4)
-	// fmt.Printf("value: %v\n", v)
 }
