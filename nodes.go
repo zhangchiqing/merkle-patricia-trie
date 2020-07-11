@@ -7,8 +7,21 @@ type Node interface {
 	Raw() []interface{}
 }
 
+func Hash(node Node) []byte {
+	if IsEmptyNode(node) {
+		return EmptyNodeHash
+	}
+	return node.Hash()
+}
+
 func Serialize(node Node) []byte {
-	raw := node.Raw()
+	var raw interface{}
+
+	if IsEmptyNode(node) {
+		raw = EmptyNodeRaw
+	} else {
+		raw = node.Raw()
+	}
 
 	rlp, err := rlp.EncodeToBytes(raw)
 	if err != nil {

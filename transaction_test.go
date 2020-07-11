@@ -179,6 +179,7 @@ func TestTrieWithBlockTxs(t *testing.T) {
 	}
 
 	txRootHash := fmt.Sprintf("%x", types.DeriveSha(types.Transactions(txs)))
+	fmt.Printf("txRootHash: %v\n", txRootHash)
 	require.Equal(t, txRootHash, fmt.Sprintf("%x", trie.Hash()))
 }
 
