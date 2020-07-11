@@ -2,4 +2,4 @@ This is a simplified implementation of Ethereum's modified Merkle Patricia tree 
 
 - This implementation is simple because it doesn't involve tree encoding/decoding, data persistent.
 - It's purely focus on the algorithm and data structure.
-- It's not made for production use, but just for learning purpose.
+- It's not made for production use, but merely for learning purpose.
