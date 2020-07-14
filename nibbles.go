@@ -51,6 +51,8 @@ func FromString(s string) []Nibble {
 	return FromBytes([]byte(s))
 }
 
+// ToPrefixed add nibble prefix to a slice of nibbles to make its length even
+// the prefix indicts whether a node is a leaf node.
 func ToPrefixed(ns []Nibble, isLeafNode bool) []Nibble {
 	// create prefix
 	var prefixBytes []Nibble
@@ -77,6 +79,8 @@ func ToPrefixed(ns []Nibble, isLeafNode bool) []Nibble {
 	return prefixed
 }
 
+// ToBytes converts a slice of nibbles to a byte slice
+// assuming the nibble slice has even number of nibbles.
 func ToBytes(ns []Nibble) []byte {
 	buf := make([]byte, 0, len(ns)/2)
 
