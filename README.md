@@ -1,3 +1,5 @@
+![Go](https://github.com/zhangchiqing/merkle-patricia-trie/workflows/Go/badge.svg)
+
 This is a simplified implementation of Ethereum's modified Merkle Patricia Trie based on [Ethereum's yellow paper](https://ethereum.github.io/yellowpaper/paper.pdf).
 
 - This implementation is simple because it doesn't involve tree encoding/decoding, data persistence.
