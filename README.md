@@ -53,9 +53,9 @@ func TestGetPut(t *testing.T) {
 (Test cases in this tutorial are included in the repo and passed.)
 
 ## Verify Data Integrity
-What's different from a standard mapping is that it allows us to verify data integrity.
+What's different from a standard mapping is that merkle patricia trie allows us to verify data integrity.
 
-One can compute the Merkle Root Hash of the Merkle Patricia Trie with the `Hash` function, such that if any key-value pair was updated, the merkle root hash of the Trie would be different; if two Tries have the idential key-value pairs, they should have the same merkle root hash.
+One can compute the Merkle Root Hash of the merkle patricia trie with the `Hash` function, such that if any key-value pair was updated, the merkle root hash of the trie would be different; if two Tries have the idential key-value pairs, they should have the same merkle root hash.
 
 ```
 type Trie interface {
@@ -101,11 +101,11 @@ func TestDataIntegrity(t *testing.T) {
 ```
 
 ## Verify the inclusion of a key-value pair
-Yes, we can verify the data integrity with the merkle root hash, but we could simply hash the list of key-value pairs, why bother creating merkle patricia trie data structure?
+Yes, the merkle patricia trie can verify data integrity, but why not simply comparing the hash by hashing the entire list of key-value pairs, why bother creating a merkle patricia trie data structure?
 
 That's because merkle patricia trie also allows us to verify the inclusion of a key-value pair without the access to the entire key-value pairs.
 
-That means merkle patricia trie can provide a proof to prove that a certain key-value pair is included in a key-value mapping with a certain merkle root hash.
+That means merkle patricia trie can provide a proof to prove that a certain key-value pair is included in a key-value mapping that produces a certain merkle root hash.
 
 ```golang
 type Proof interface {}
@@ -119,13 +119,13 @@ type Trie interface {
 func VerifyProof(rootHash []byte, key []byte, proof Proof) (value []byte, err error)
 ```
 
-This is useful in Ethereum. For instance, imagine the world state is a key-value mapping, and the keys are each account address, and the values are the balance for each account.
+This is useful in Ethereum. For instance, imagine the Ethereum world state is a key-value mapping, and the keys are each account address, and the values are the balances for each account.
 
-As a light Client, which don't have the access to the full blockchain state like full nodes do, but only the merkle root hash, how can it trust the result of its account balance returned from a full node?
+As a light client, which don't have the access to the full blockchain state like full nodes do, but only the merkle root hash for certain block, how can it trust the result of its account balance returned from a full node?
 
 The answer is, a full node can provide a merkle proof which contains the merkle root hash, the account key and its balance value, as well as other data. This merkle proof allows a light client to verify the correctness by its own without having access to the full blockchain state.
 
-Let's explain the behavior with the following test cases:
+Let's explain this behavior with test cases:
 
 ```golang
 func TestProveAndVerifyProof(t *testing.T) {
@@ -190,9 +190,7 @@ It's pretty cool that small as the merkle root hash can be used to verify the st
 
 ## Verify the implementation
 
-I've explained how merkle patrica trie works. This repo provides a simple implementation of the Merkle Patricia Trie. I recommend you to implement it yourself too.
-
-But, how can we verify our implementation?
+I've explained how merkle patrica trie works. This repo provides a simple implementation. But, how can we verify our implementation?
 
 An easy way is to verify with the Ethereum mainnet data and the official Trie implementation in golang.
 
@@ -204,8 +202,8 @@ For instance, I picked the [block 10467135 on mainnet](https://etherscan.io/bloc
 
 Since the transaction root for block `10467135` is [`0xbb345e208bda953c908027a45aa443d6cab6b8d2fd64e83ec52f1008ddeafa58`](https://api.etherscan.io/api?module=proxy&action=eth_getBlockByNumber&tag=0x9fb73f&boolean=true&apikey=YourApiKeyToken). I can create a test case that adds the 193 transactions of block 10467135 to our Trie and check:
 
-- If the merkle root hash is `bb345e208bda953c908027a45aa443d6cab6b8d2fd64e83ec52f1008ddeafa58`.
-- Whether a merkle proof for a certain transaction generated from our implementation could be verified by the official implementation.
+- Whether the merkle root hash is `bb345e208bda953c908027a45aa443d6cab6b8d2fd64e83ec52f1008ddeafa58`.
+- Whether a merkle proof for a certain transaction generated from our trie implementation could be verified by the official implementation.
 
 But what would be the keys and values for the list of transactions? The keys are the RLP encoding of a unsigned integer starting from index 0; the values are the RLP encoding of the cooresponding transactions.
 
