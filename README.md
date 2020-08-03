@@ -204,8 +204,8 @@ For instance, I picked the [block 10467135 on mainnet](https://etherscan.io/bloc
 
 Since the transaction root for block `10467135` is [`0xbb345e208bda953c908027a45aa443d6cab6b8d2fd64e83ec52f1008ddeafa58`](https://api.etherscan.io/api?module=proxy&action=eth_getBlockByNumber&tag=0x9fb73f&boolean=true&apikey=YourApiKeyToken). I can create a test case that adds the 193 transactions of block 10467135 to our Trie and check:
 
-1) If the merkle root hash is ``.
-2) Whether a merkle proof for a certain transaction generated from our implementation could be verified by the official implementation.
+- If the merkle root hash is `bb345e208bda953c908027a45aa443d6cab6b8d2fd64e83ec52f1008ddeafa58`.
+- Whether a merkle proof for a certain transaction generated from our implementation could be verified by the official implementation.
 
 But what would be the keys and values for the list of transactions? The keys are the RLP encoding of a unsigned integer starting from index 0; the values are the RLP encoding of the cooresponding transactions.
 
@@ -282,3 +282,7 @@ func TestTransactionRootAndProof(t *testing.T) {
 	})
 }
 ```
+
+## Summary
+
+Merkle Patricia Trie is a data structure that stores key-value pairs. In additional to that, it also allows us to verify data integrity and the inclusion of a key-value pair.
