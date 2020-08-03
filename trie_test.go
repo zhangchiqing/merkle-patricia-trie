@@ -11,6 +11,65 @@ func hexEqual(t *testing.T, hex string, bytes []byte) {
 	require.Equal(t, hex, fmt.Sprintf("%x", bytes))
 }
 
+// check basic key-value mapping
+func TestGetPut(t *testing.T) {
+	t.Run("should get nothing if key does not exist", func(t *testing.T) {
+		trie := NewTrie()
+		_, found := trie.Get([]byte("notexist"))
+		require.Equal(t, false, found)
+	})
+
+	t.Run("should get value if key exist", func(t *testing.T) {
+		trie := NewTrie()
+		trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
+		val, found := trie.Get([]byte{1, 2, 3, 4})
+		require.Equal(t, true, found)
+		require.Equal(t, val, []byte("hello"))
+	})
+
+	t.Run("should get updated value", func(t *testing.T) {
+		trie := NewTrie()
+		trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
+		trie.Put([]byte{1, 2, 3, 4}, []byte("world"))
+		val, found := trie.Get([]byte{1, 2, 3, 4})
+		require.Equal(t, true, found)
+		require.Equal(t, val, []byte("world"))
+	})
+}
+
+// verify data integrity
+func TestDataIntegrity(t *testing.T) {
+	t.Run("should get a different hash if a new key-value pair was added or updated", func(t *testing.T) {
+		trie := NewTrie()
+		hash0 := trie.Hash()
+
+		trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
+		hash1 := trie.Hash()
+
+		trie.Put([]byte{1, 2}, []byte("world"))
+		hash2 := trie.Hash()
+
+		trie.Put([]byte{1, 2}, []byte("trie"))
+		hash3 := trie.Hash()
+
+		require.NotEqual(t, hash0, hash1)
+		require.NotEqual(t, hash1, hash2)
+		require.NotEqual(t, hash2, hash3)
+	})
+
+	t.Run("should get the same hash if two tries have the identicial key-value pairs", func(t *testing.T) {
+		trie1 := NewTrie()
+		trie1.Put([]byte{1, 2, 3, 4}, []byte("hello"))
+		trie1.Put([]byte{1, 2}, []byte("world"))
+
+		trie2 := NewTrie()
+		trie2.Put([]byte{1, 2, 3, 4}, []byte("hello"))
+		trie2.Put([]byte{1, 2}, []byte("world"))
+
+		require.Equal(t, trie1.Hash(), trie2.Hash())
+	})
+}
+
 func TestPut2Pairs(t *testing.T) {
 	trie := NewTrie()
 	trie.Put([]byte{1, 2, 3, 4}, []byte("verb"))

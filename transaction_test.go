@@ -17,6 +17,53 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestTransactionRootAndProof(t *testing.T) {
+
+	trie := NewTrie()
+
+	txs := TransactionsJSON(t)
+
+	for i, tx := range txs {
+		// key is the encoding of the index as the unsigned integer type
+		key, err := rlp.EncodeToBytes(uint(i))
+		require.NoError(t, err)
+
+		transaction := FromEthTransaction(tx)
+
+		// value is the RLP encoding of a transaction
+		rlp, err := transaction.GetRLP()
+		require.NoError(t, err)
+
+		trie.Put(key, rlp)
+	}
+
+	// the transaction root for block 10467135
+	// https://api.etherscan.io/api?module=proxy&action=eth_getBlockByNumber&tag=0x9fb73f&boolean=true&apikey=YourApiKeyToken
+	transactionRoot, err := hex.DecodeString("bb345e208bda953c908027a45aa443d6cab6b8d2fd64e83ec52f1008ddeafa58")
+	require.NoError(t, err)
+
+	t.Run("merkle root hash should match with 10467135's transactionRoot", func(t *testing.T) {
+		// transaction root should match with block 10467135's transactionRoot
+		require.Equal(t, transactionRoot, trie.Hash())
+	})
+
+	t.Run("a merkle proof for a certain transaction can be verified by the offical trie implementation", func(t *testing.T) {
+		key, err := rlp.EncodeToBytes(uint(30))
+		require.NoError(t, err)
+
+		proof, found := trie.Prove(key)
+		require.Equal(t, true, found)
+
+		txRLP, err := VerifyProof(transactionRoot, key, proof)
+		require.NoError(t, err)
+
+		// verify that if the verification passes, it returns the RLP encoded transaction
+		rlp, err := FromEthTransaction(txs[30]).GetRLP()
+		require.NoError(t, err)
+		require.Equal(t, rlp, txRLP)
+	})
+}
+
 func TestTransactionFromJSON(t *testing.T) {
 	tx := TransactionJSON(t)
 	require.Equal(t, uint64(0x144), tx.Nonce())

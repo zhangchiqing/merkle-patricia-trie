@@ -35,15 +35,50 @@ func TestMyTrie(t *testing.T) {
 }
 
 func TestProveAndVerifyProof(t *testing.T) {
-	tr := NewTrie()
-	tr.Put([]byte{1, 2, 3}, []byte("hello"))
-	tr.Put([]byte{1, 2, 3, 4, 5}, []byte("world"))
+	t.Run("should not generate proof for non-exist key", func(t *testing.T) {
+		tr := NewTrie()
+		tr.Put([]byte{1, 2, 3}, []byte("hello"))
+		tr.Put([]byte{1, 2, 3, 4, 5}, []byte("world"))
+		notExistKey := []byte{1, 2, 3, 4}
+		_, ok := tr.Prove(notExistKey)
+		require.False(t, ok)
+	})
 
-	key := []byte{1, 2, 3}
-	proof, ok := tr.Prove(key)
-	require.True(t, ok)
+	t.Run("should generate a proof for an existing key, the proof can be verified with the merkle root hash", func(t *testing.T) {
+		tr := NewTrie()
+		tr.Put([]byte{1, 2, 3}, []byte("hello"))
+		tr.Put([]byte{1, 2, 3, 4, 5}, []byte("world"))
 
-	val, err := VerifyProof(tr.Hash(), key, proof)
-	require.NoError(t, err)
-	require.Equal(t, []byte("hello"), val)
+		key := []byte{1, 2, 3}
+		proof, ok := tr.Prove(key)
+		require.True(t, ok)
+
+		rootHash := tr.Hash()
+
+		// verify the proof with the root hash, the key in question and its proof
+		val, err := VerifyProof(rootHash, key, proof)
+		require.NoError(t, err)
+
+		// when the verification has passed, it should return the correct value for the key
+		require.Equal(t, []byte("hello"), val)
+	})
+
+	t.Run("should fail the verification of the trie was updated", func(t *testing.T) {
+		tr := NewTrie()
+		tr.Put([]byte{1, 2, 3}, []byte("hello"))
+		tr.Put([]byte{1, 2, 3, 4, 5}, []byte("world"))
+
+		// the hash was taken before the trie was updated
+		rootHash := tr.Hash()
+
+		// the proof was generated after the trie was updated
+		tr.Put([]byte{5, 6, 7}, []byte("trie"))
+		key := []byte{1, 2, 3}
+		proof, ok := tr.Prove(key)
+		require.True(t, ok)
+
+		// should fail the verification since the merkle root hash doesn't match
+		_, err := VerifyProof(rootHash, key, proof)
+		require.Error(t, err)
+	})
 }
