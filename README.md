@@ -294,18 +294,21 @@ Internally, the trie has 4 types of nodes: EmptyNode, LeafNode, BranchNode and E
 
 As an example, let's take at block xxx to show how a transaction trie was built and how is it stored.
 
-Block <xxx> is a block only has 4 transactions with the transactionRoot hash: <YYY>. So to store the 4 transactions to a trie, we are actually storing the following key-value pairs in hexstring form:
+[Block 10593417](https://etherscan.io/block/10593417) on mainnet is a block only has 4 transactions with the transactionRoot hash: [0xab41f886be23cd786d8a69a72b0f988ea72e0b2e03970d0798f5e03763a442cc](https://api.etherscan.io/api?module=proxy&action=eth_getBlockByNumber&tag=0xa1a489&boolean=true&apikey=YourApiKeyToken). So to store the 4 transactions to a trie, we are actually storing the following key-value pairs in hexstring form:
 
 ```
-(80, tx0)
-(01, tx1)
-(02, tx2)
-(03, tx3)
+(80, f8ab81a5852e90edd00083012bc294a3bed4e1c75d00fa6f4e5e6922db7261b5e9acd280b844a9059cbb0000000000000000000000008bda8b9823b8490e8cf220dc7b91d97da1c54e250000000000000000000000000000000000000000000000056bc75e2d6310000026a06c89b57113cf7da8aed7911310e03d49be5e40de0bd73af4c9c54726c478691ba056223f039fab98d47c71f84190cf285ce8fc7d9181d6769387e5efd0a970e2e9)
+
+(01, f8ab81a6852e90edd00083012bc294a3bed4e1c75d00fa6f4e5e6922db7261b5e9acd280b844a9059cbb0000000000000000000000008bda8b9823b8490e8cf220dc7b91d97da1c54e250000000000000000000000000000000000000000000000056bc75e2d6310000026a0d77c66153a661ecc986611dffda129e14528435ed3fd244c3afb0d434e9fd1c1a05ab202908bf6cbc9f57c595e6ef3229bce80a15cdf67487873e57cc7f5ad7c8a)
+
+(02, f86d8229f185199c82cc008252089488e9a2d38e66057e18545ce03b3ae9ce4fc360538702ce7de1537c008025a096e7a1d9683b205f697b4073a3e2f0d0ad42e708f03e899c61ed6a894a7f916aa05da238fbb96d41a4b5ec0338c86cfcb627d0aa8e556f21528e62f31c32f7e672)
+
+(03, f86f826b2585199c82cc0083015f9094e955ede0a3dbf651e2891356ecd0509c1edb8d9c8801051fdc4efdc0008025a02190f26e70a82d7f66354a13cda79b6af1aa808db768a787aeb348d425d7d0b3a06a82bd0518bc9b69dc551e20d772a1b06222edfc5d39b6973e4f4dc46ed8b196)
 ```
 
 `80` is the hex form of the bytes from the result of RLP encoding of unsigned integer 0: `RLP(uint(0))`. `01` is the result of `RLP(uint(1))`, and so on.
 
-`tx0` is the result of RLP encoding of the first transaction. `tx1` is for the second transaction, and so on.
+The value for key `80` is the result of RLP encoding of the first transaction. The value for key `01` is for the second transaction, and so on.
 
 So we will add the above 4 key-value pairs to the trie, and let's see how the internal structure of the trie changes when adding each of them.
 
@@ -323,35 +326,54 @@ type Trie struct {
 
 When a trie is created, the root node points to an EmptyNode.
 
+![empty trie](/diagrams/0_empty_node.png)
+
 ### Adding the 1st transaction
 
 When adding the key-value pair of the 1st transaction, a LeafNode is created with the transaction data stored in it. And the root node is updated to point to that LeafNode.
+
+![adding the first transaction to the trie](/diagrams/1_add_1st_tx.png)
 
 ### Adding the 2nd transaction
 
 When adding the 2nd transaction, the LeafNode at the root will be turned into a BranchNode with two branches pointing to the 2 LeafNodes. The LeafNode on the right side holds the remaining nibbles (nibbles are a single hex character) - `1`, and the value for the 2nd transaction.
 
-And now the root node is pointing to the new BranchNode
+And now the root node is pointing to the new BranchNode.
+
+![adding the second transaction to the trie](/diagrams/2_add_2nd_tx.png)
+
+![adding the second transaction to the trie - key value pairs](/diagrams/2_add_2nd_tx_kv.png)
 
 ### Adding the 3rd transaction
 
 Adding the 3rd transaction will turn the LeafNode on the right side to be a BranchNode, similar to the process of adding the 2nd transaction. Although the root node didn't change, its root hash has been changed, because it's `0` branch is pointing to a different node with different hashes.
 
+![adding the third transaction to the trie](/diagrams/3_add_3rd_tx.png)
+
+![adding the third transaction to the trie - key value pairs](/diagrams/3_add_3rd_tx_kv.png)
+
 ### Adding the 4th transaction
 
 Adding the last transaction is similar to adding the 3rd transaction. Now we can verify the root hash is identicial to the transactionRoot included in the block.
 
+![adding the last transaction to the trie](/diagrams/4_add_4th_tx.png)
+
+![adding the last transaction to the trie - key value pairs](/diagrams/4_add_4th_tx_kv.png)
+
 ### Getting Merkle Proof for the 3rd transaction
 
 The Merkle Proof for the 3rd transaction is simply the path to the LeafNode that stores the value of the 3rd transaction. When verifying the proof, one can start from the root hash, decode the Node, match the nibbles, and repeat until find the Node that matches all the remaining nibbles. If found, then the value is the one paired with the key; if not found, then the merkle proof is invalid.
-
 
 ## The rule of updating the trie
 
 In the above example, we've built a trie with 3 types of Nodes: EmptyNode, LeafNode and BranchNode. However, we didn't have the chance to use ExtensionNode. Please find other test cases that use the ExtensionNode.
 
 In general, the rule is:
-1)
+- When stopped at an EmptyNode, replace it with a new LeafNode with the remaining path.
+- When stopped at a LeafNode, convert it to an ExtensionNode and add a new branch and a new LeafNode.
+- When stopped at an ExtensionNode, convert it to another ExtensionNode with shorter path and create a new BranchNode points to the ExtensionNode.
+
+There are quite some details, if you are interested, you can read the [source code](https://github.com/zhangchiqing/merkle-patricia-trie/blob/master/trie.go#L62).
 
 ## Summary
 

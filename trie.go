@@ -59,14 +59,11 @@ func (t *Trie) Get(key []byte) ([]byte, bool) {
 	}
 }
 
-// 80 "aa"
-// 01 "bb"
-// 0
-
-// In general, when inserting into a MPT
-// if you stopped at an empty node, you add a new leaf node with the remaining path and replace the empty node with the hash of the new leaf node
-// if you stopped at a leaf node, you need to convert it to an extension node and add a new branch and a new leaf node
-// if you stopped at an extension node, you convert it to another extension node with shorter path and create a new branch a leaves
+// Put adds a key value pair to the trie
+// In general, the rule is:
+// - When stopped at an EmptyNode, replace it with a new LeafNode with the remaining path.
+// - When stopped at a LeafNode, convert it to an ExtensionNode and add a new branch and a new LeafNode.
+// - When stopped at an ExtensionNode, convert it to another ExtensionNode with shorter path and create a new BranchNode points to the ExtensionNode.
 func (t *Trie) Put(key []byte, value []byte) {
 	// need to use pointer, so that I can update root in place without
 	// keeping trace of the parent node
