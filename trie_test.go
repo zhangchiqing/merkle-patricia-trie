@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 )
 
@@ -156,4 +158,61 @@ func TestPutOrder(t *testing.T) {
 	trie2.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("world"))
 
 	require.Equal(t, trie1.Hash(), trie2.Hash())
+}
+
+type MockDB struct {
+	keyValueStore map[string][]byte
+}
+
+func NewMockDB() *MockDB {
+	return &MockDB{
+		keyValueStore: make(map[string][]byte),
+	}
+}
+
+func (db *MockDB) Put(key []byte, value []byte) (ok bool) {
+	db.keyValueStore[fmt.Sprintf("%x", key)] = value
+	return true
+}
+
+func (db *MockDB) Get(key []byte) (value []byte, ok bool) {
+	value, isPresent := db.keyValueStore[fmt.Sprintf("%x", key)]
+	return value, isPresent
+}
+
+func (db *MockDB) Delete(key []byte) (value []byte, ok bool) {
+	if value, isPresent := db.keyValueStore[fmt.Sprintf("%x", key)]; isPresent {
+		delete(db.keyValueStore, fmt.Sprintf("%x", key))
+		return value, true
+	} else {
+		return nil, false
+	}
+}
+
+func TestPersistInDB(t *testing.T) {
+	trie := NewTrie()
+
+	trie.Put([]byte{1, 2, 3, 4}, []byte("verb"))
+	trie.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("coin"))
+
+	mockDB := NewMockDB()
+
+	trie.PersistInDB(mockDB)
+
+	hexEqual(t, "64d67c5318a714d08de6958c0e63a05522642f3f1087c6fd68a97837f203d359", crypto.Keccak256(mockDB.keyValueStore[fmt.Sprintf("%x", "rootHash")]))
+
+	ext, ok := trie.root.(*ExtensionNode)
+	require.True(t, ok)
+	branch, ok := ext.Next.(*BranchNode)
+	require.True(t, ok)
+	leaf, ok := branch.Branches[0].(*LeafNode)
+	require.True(t, ok)
+
+	expectedKeyValueStore := map[string][]byte{
+		fmt.Sprintf("%x", "rootHash"):    ext.Serialize(),
+		fmt.Sprintf("%x", branch.Hash()): branch.Serialize(),
+		fmt.Sprintf("%x", leaf.Hash()):   leaf.Serialize(),
+	}
+
+	require.True(t, reflect.DeepEqual(expectedKeyValueStore, mockDB.keyValueStore))
 }

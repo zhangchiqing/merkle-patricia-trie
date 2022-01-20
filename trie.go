@@ -192,3 +192,54 @@ func (t *Trie) Put(key []byte, value []byte) {
 	}
 
 }
+
+type DB interface {
+	Put(key []byte, value []byte) (ok bool)
+	Get(key []byte) (value []byte, ok bool)
+	Delete(key []byte) (value []byte, ok bool)
+}
+
+func (t *Trie) PersistInDB(db DB) {
+	nodes := []Node{t.root}
+	currentNode := (Node)(nil)
+
+	for len(nodes) > 0 {
+		currentNode = nodes[0]
+		nodes = nodes[1:]
+
+		if IsEmptyNode(currentNode) {
+			continue
+		}
+
+		if leaf, ok := currentNode.(*LeafNode); ok {
+			leafHash := leaf.Hash()
+			db.Put(leafHash, leaf.Serialize())
+			continue
+		}
+
+		if branch, ok := currentNode.(*BranchNode); ok {
+			branchHash := branch.Hash()
+			db.Put(branchHash, branch.Serialize())
+
+			for i := 0; i < 16; i++ {
+				if !IsEmptyNode(branch.Branches[i]) {
+					nodes = append(nodes, branch.Branches[i])
+				}
+			}
+		}
+
+		if ext, ok := currentNode.(*ExtensionNode); ok {
+			extHash := ext.Hash()
+			db.Put(extHash, ext.Serialize())
+
+			nodes = append(nodes, ext.Next)
+			continue
+		}
+	}
+
+	rootHash := t.root.Hash()
+	if currentlyStoredRoot, ok := db.Get(rootHash); ok {
+		db.Put([]byte("rootHash"), currentlyStoredRoot)
+		db.Delete(rootHash)
+	}
+}
