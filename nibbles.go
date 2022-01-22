@@ -79,6 +79,38 @@ func ToPrefixed(ns []Nibble, isLeafNode bool) []Nibble {
 	return prefixed
 }
 
+// RemovePrefix removes nibble prefix from a slice of nibbles and
+//tells if the nibbles belong to a leaf node
+func RemovePrefix(ns []Nibble) (noPrefixNs []Nibble, isLeafNode bool) {
+
+	// From https://eth.wiki/fundamentals/patricia-tree:
+	//
+	// 	hex char    bits    |    node type partial     path length
+	// ----------------------------------------------------------
+	//    0        0000    |       extension              even
+	//    1        0001    |       extension              odd
+	//    2        0010    |   terminating (leaf)         even
+	//    3        0011    |   terminating (leaf)         odd
+
+	if ns[0] == 1 {
+		return ns[1:], false
+	}
+
+	if ns[0] == 3 {
+		return ns[1:], true
+	}
+
+	if ns[0] == 0 {
+		return ns[2:], false
+	}
+
+	if ns[0] == 2 {
+		return ns[2:], true
+	}
+
+	panic("invalid nibble prefix")
+}
+
 // ToBytes converts a slice of nibbles to a byte slice
 // assuming the nibble slice has even number of nibbles.
 func ToBytes(ns []Nibble) []byte {

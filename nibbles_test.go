@@ -73,6 +73,68 @@ func TestToPrefixed(t *testing.T) {
 	}
 }
 
+func TestRemovePrefix(t *testing.T) {
+	cases := []struct {
+		ns         []Nibble
+		expected   []Nibble
+		isLeafNode bool
+	}{
+		{
+			[]Nibble{1, 1},
+			[]Nibble{1},
+			false,
+		},
+		{
+			[]Nibble{0, 0, 1, 2},
+			[]Nibble{1, 2},
+			false,
+		},
+		{
+			[]Nibble{3, 1},
+			[]Nibble{1},
+			true,
+		},
+		{
+			[]Nibble{2, 0, 1, 2},
+			[]Nibble{1, 2},
+			true,
+		},
+		{
+			[]Nibble{3, 5, 0, 6},
+			[]Nibble{5, 0, 6},
+			true,
+		},
+		{
+			[]Nibble{0, 0, 14, 3},
+			[]Nibble{14, 3},
+			false,
+		},
+		{
+			[]Nibble{2, 0, 9, 3, 6, 5},
+			[]Nibble{9, 3, 6, 5},
+			true,
+		},
+		{
+			[]Nibble{2, 0, 1, 3, 3, 5},
+			[]Nibble{1, 3, 3, 5},
+			true,
+		},
+		{
+			[]Nibble{3, 7},
+			[]Nibble{7},
+			true,
+		},
+	}
+
+	for _, c := range cases {
+		nibbles, isLeafNode := RemovePrefix(c.ns)
+		require.Equal(t,
+			c.expected,
+			nibbles)
+		require.Equal(t, c.isLeafNode, isLeafNode)
+	}
+}
+
 func TestFromBytes(t *testing.T) {
 	// [1, 100] -> ['0x01', '0x64']
 	require.Equal(t, []Nibble{0, 1, 6, 4}, FromBytes([]byte{1, 100}))
