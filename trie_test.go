@@ -187,3 +187,21 @@ func TestPersistInDB(t *testing.T) {
 
 	require.True(t, reflect.DeepEqual(expectedKeyValueStore, mockDB.keyValueStore))
 }
+
+func TestGenerateFromDB(t *testing.T) {
+	trie := NewTrie()
+
+	trie.Put([]byte{1, 2, 3, 4}, []byte("verb"))
+	trie.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("coin"))
+	trie.Put([]byte{1, 2, 3, 10}, []byte("crash"))
+
+	mockDB := NewMockDB()
+
+	trie.PersistInDB(mockDB)
+
+	newTrie := NewTrie()
+	newTrie.GenerateFromDB(mockDB)
+	require.Equal(t, trie.root.Hash(), newTrie.root.Hash())
+
+	require.True(t, reflect.DeepEqual(trie, newTrie))
+}

@@ -243,3 +243,13 @@ func (t *Trie) PersistInDB(db DB) {
 		db.Delete(rootHash)
 	}
 }
+
+func (t *Trie) GenerateFromDB(db DB) {
+	serializedRoot, found := db.Get([]byte("rootHash"))
+	if !found {
+		panic("root not found in db")
+	}
+
+	rootNode := Deserialize(serializedRoot, db)
+	t.root = rootNode
+}

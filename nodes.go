@@ -67,7 +67,11 @@ func FromRaw(rawNode []interface{}, db DB) Node {
 		}
 
 		if value, ok := rawNode[16].([]byte); ok {
-			branchNode.Value = value
+			if len(value) == 0 {
+				branchNode.Value = nil
+			} else {
+				branchNode.Value = value
+			}
 		} else {
 			panic("value of branch node not understood")
 		}
