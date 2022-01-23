@@ -47,9 +47,9 @@ func FromRaw(rawNode []interface{}, db DB) Node {
 			if rawBranchBytes, ok := rawBranch.([]byte); ok {
 				if len(rawBranchBytes) != 0 {
 					// Keccak256 hash
-					serializedNodeFromDB, ok := db.Get(rawBranchBytes)
-					if !ok {
-						panic("node not found in db")
+					serializedNodeFromDB, err := db.Get(rawBranchBytes)
+					if err != nil {
+						panic(err)
 					} else {
 						deserializedNode := Deserialize(serializedNodeFromDB, db)
 						branchNode.Branches[i] = deserializedNode
@@ -92,9 +92,9 @@ func FromRaw(rawNode []interface{}, db DB) Node {
 			if rawNextNodeBytes, ok := rawNextNode.([]byte); ok {
 				if len(rawNextNodeBytes) != 0 {
 					// Keccak256 hash
-					serializedNodeFromDB, ok := db.Get(rawNextNodeBytes)
-					if !ok {
-						panic("node not found in db")
+					serializedNodeFromDB, err := db.Get(rawNextNodeBytes)
+					if err != nil {
+						panic(err)
 					} else {
 						deserializedNode := Deserialize(serializedNodeFromDB, db)
 						extensionNode.Next = deserializedNode

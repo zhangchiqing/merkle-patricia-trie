@@ -43,7 +43,7 @@ func TestDeserializeNodes(t *testing.T) {
 		mockDB := NewMockDB()
 
 		serializedBranchNode := branchNode.Serialize()
-		require.PanicsWithValue(t, "node not found in db", func() { Deserialize(serializedBranchNode, mockDB) })
+		require.Panics(t, func() { Deserialize(serializedBranchNode, mockDB) })
 	})
 
 	t.Run("deserialize extension node with next node of size < 32", func(t *testing.T) {
@@ -82,6 +82,23 @@ func TestDeserializeNodes(t *testing.T) {
 		mockDB := NewMockDB()
 
 		serializedExtensionNode := extensionNode.Serialize()
-		require.PanicsWithValue(t, "node not found in db", func() { Deserialize(serializedExtensionNode, mockDB) })
+		require.Panics(t, func() { Deserialize(serializedExtensionNode, mockDB) })
+	})
+
+	t.Run("deep subtrie with size < 32", func(t *testing.T) {
+		ext1 := NewExtensionNode([]Nibble{10, 10}, nil)
+		next1 := NewExtensionNode([]Nibble{2, 3}, nil)
+		leaf := NewLeafNodeFromNibbles([]Nibble{3}, []byte("a"))
+
+		next1.Next = leaf
+		require.Less(t, len(next1.Serialize()), 32)
+
+		ext1.Next = next1
+
+		mockDB := NewMockDB()
+
+		serializedExt := ext1.Serialize()
+		deserializedExt := Deserialize(serializedExt, mockDB)
+		require.True(t, reflect.DeepEqual(deserializedExt, ext1))
 	})
 }
