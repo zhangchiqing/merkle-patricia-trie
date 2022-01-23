@@ -3,9 +3,7 @@
 ## Intro
 This is a simplified implementation of Ethereum's modified Merkle Patricia Trie based on the [Ethereum's yellow paper](https://ethereum.github.io/yellowpaper/paper.pdf). It's written in golang.
 
-- This implementation is simple because it doesn't involve tree encoding/decoding, data persistence.
-- Its purely focused on the algorithm and data structure.
-- It's not made for production use, but for learning purpose.
+This implementation was originally written by [Leo Zhang](https://github.com/zhangchiqing) without a persistence feature for learning purposes only. However, Veritas engineers are actively working on creating an encoding/decoding mechanism, and an added layer of on-disk persistence with LevelDB.
 
 This repo also includes a tutorial of how Merkle Patrica Trie works.
 
