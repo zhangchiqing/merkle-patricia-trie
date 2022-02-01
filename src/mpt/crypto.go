@@ -1,4 +1,4 @@
-package main
+package mpt
 
 import "golang.org/x/crypto/sha3"
 

@@ -1,4 +1,4 @@
-package main
+package mpt
 
 import (
 	"github.com/ethereum/go-ethereum/crypto"

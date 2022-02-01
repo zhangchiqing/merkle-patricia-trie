@@ -1,4 +1,4 @@
-package main
+package mpt
 
 import (
 	"encoding/hex"
