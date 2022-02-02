@@ -26,7 +26,7 @@ type Batch struct {
 	keyValueBatch *leveldb.Batch
 }
 
-func newDatabase(levelDB *leveldb.DB) *Database {
+func NewDatabase(levelDB *leveldb.DB) *Database {
 	return &Database{keyValueDB: levelDB}
 }
 
