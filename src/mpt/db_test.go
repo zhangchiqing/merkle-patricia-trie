@@ -22,7 +22,7 @@ func TestIntegrationWithLevelDB(t *testing.T) {
 
 		defer levelDB.Close()
 
-		database := newDatabase(levelDB)
+		database := NewDatabase(levelDB)
 
 		trie := NewTrie()
 
@@ -84,7 +84,7 @@ func TestIntegrationWithLevelDB(t *testing.T) {
 
 		defer levelDB.Close()
 
-		database := newDatabase(levelDB)
+		database := NewDatabase(levelDB)
 
 		trie.PersistInDB(database)
 
