@@ -8,11 +8,14 @@ func NewTrie() *Trie {
 	return &Trie{}
 }
 
-func (t *Trie) Hash() []byte {
-	if IsEmptyNode(t.root) {
-		return EmptyNodeHash
+func (t *Trie) NewTrieFromDB(db DB) {
+	serializedRoot, err := db.Get([]byte("root"))
+	if err != nil {
+		panic(err)
 	}
-	return t.root.Hash()
+
+	rootNode := Deserialize(serializedRoot, db)
+	t.root = rootNode
 }
 
 func (t *Trie) Get(key []byte) ([]byte, bool) {
@@ -193,56 +196,16 @@ func (t *Trie) Put(key []byte, value []byte) {
 
 }
 
-func (t *Trie) ToDBBatch(db DB) DBBatch {
-	nodes := []Node{t.root}
-	currentNode := (Node)(nil)
-	batch := db.NewBatch()
-
-	for len(nodes) > 0 {
-		currentNode = nodes[0]
-		nodes = nodes[1:]
-
-		if IsEmptyNode(currentNode) {
-			continue
-		}
-
-		if leaf, ok := currentNode.(*LeafNode); ok {
-			leafHash := leaf.Hash()
-			batch.Put(leafHash, leaf.Serialize())
-			continue
-		}
-
-		if branch, ok := currentNode.(*BranchNode); ok {
-			branchHash := branch.Hash()
-			batch.Put(branchHash, branch.Serialize())
-
-			for i := 0; i < 16; i++ {
-				if !IsEmptyNode(branch.Branches[i]) {
-					nodes = append(nodes, branch.Branches[i])
-				}
-			}
-		}
-
-		if ext, ok := currentNode.(*ExtensionNode); ok {
-			extHash := ext.Hash()
-			batch.Put(extHash, ext.Serialize())
-
-			nodes = append(nodes, ext.Next)
-			continue
-		}
+func (t *Trie) Hash() []byte {
+	if IsEmptyNode(t.root) {
+		return EmptyNodeHash
 	}
-
-	rootHash := t.root.Hash()
-	batch.Put([]byte("rootHash"), Serialize(t.root))
-	batch.Delete(rootHash)
-
-	return batch
+	return t.root.Hash()
 }
 
 func (t *Trie) PersistInDB(db DB) {
 	nodes := []Node{t.root}
 	currentNode := (Node)(nil)
-	batch := db.NewBatch()
 
 	for len(nodes) > 0 {
 		currentNode = nodes[0]
@@ -254,13 +217,13 @@ func (t *Trie) PersistInDB(db DB) {
 
 		if leaf, ok := currentNode.(*LeafNode); ok {
 			leafHash := leaf.Hash()
-			batch.Put(leafHash, leaf.Serialize())
+			db.Put(leafHash, leaf.Serialize())
 			continue
 		}
 
 		if branch, ok := currentNode.(*BranchNode); ok {
 			branchHash := branch.Hash()
-			batch.Put(branchHash, branch.Serialize())
+			db.Put(branchHash, branch.Serialize())
 
 			for i := 0; i < 16; i++ {
 				if !IsEmptyNode(branch.Branches[i]) {
@@ -271,7 +234,7 @@ func (t *Trie) PersistInDB(db DB) {
 
 		if ext, ok := currentNode.(*ExtensionNode); ok {
 			extHash := ext.Hash()
-			batch.Put(extHash, ext.Serialize())
+			db.Put(extHash, ext.Serialize())
 
 			nodes = append(nodes, ext.Next)
 			continue
@@ -279,20 +242,10 @@ func (t *Trie) PersistInDB(db DB) {
 	}
 
 	rootHash := t.root.Hash()
-	batch.Put([]byte("rootHash"), Serialize(t.root))
-	batch.Delete(rootHash)
-
-	if err := db.BatchWrite(batch); err != nil {
-		panic(err)
-	}
-}
-
-func (t *Trie) GenerateFromDB(db DB) {
-	serializedRoot, err := db.Get([]byte("rootHash"))
-	if err != nil {
-		panic(err)
-	}
-
-	rootNode := Deserialize(serializedRoot, db)
-	t.root = rootNode
+	// TOD0 [Alice]: Ask Ahsan why these two lines (it /was/ two lines when
+	// WriteBatch was still a thing) were originally swapped.
+	//
+	// TODO [Alice]: Ask Ahsan why we delete rootHash.
+	db.Delete(rootHash)
+	db.Put([]byte("root"), Serialize(t.root))
 }

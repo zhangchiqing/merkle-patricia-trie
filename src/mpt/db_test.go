@@ -31,7 +31,7 @@ func TestIntegrationWithLevelDB(t *testing.T) {
 
 		trie.PersistInDB(database)
 
-		storedRoot, err := database.Get([]byte("rootHash"))
+		storedRoot, err := database.Get([]byte("root"))
 		if err != nil {
 			panic(err)
 		}
@@ -46,7 +46,7 @@ func TestIntegrationWithLevelDB(t *testing.T) {
 		require.True(t, ok)
 
 		expectedKeyValueStore := map[string][]byte{
-			fmt.Sprintf("%x", "rootHash"):    ext.Serialize(),
+			fmt.Sprintf("%x", "root"):        ext.Serialize(),
 			fmt.Sprintf("%x", branch.Hash()): branch.Serialize(),
 			fmt.Sprintf("%x", leaf.Hash()):   leaf.Serialize(),
 		}
@@ -89,7 +89,7 @@ func TestIntegrationWithLevelDB(t *testing.T) {
 		trie.PersistInDB(database)
 
 		newTrie := NewTrie()
-		newTrie.GenerateFromDB(database)
+		newTrie.NewTrieFromDB(database)
 		require.Equal(t, trie.root.Hash(), newTrie.root.Hash())
 
 		require.True(t, reflect.DeepEqual(trie, newTrie))

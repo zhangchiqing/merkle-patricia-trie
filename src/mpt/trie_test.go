@@ -170,7 +170,7 @@ func TestPersistInDB(t *testing.T) {
 
 	trie.PersistInDB(mockDB)
 
-	hexEqual(t, "64d67c5318a714d08de6958c0e63a05522642f3f1087c6fd68a97837f203d359", crypto.Keccak256(mockDB.keyValueStore[fmt.Sprintf("%x", "rootHash")]))
+	hexEqual(t, "64d67c5318a714d08de6958c0e63a05522642f3f1087c6fd68a97837f203d359", crypto.Keccak256(mockDB.keyValueStore[fmt.Sprintf("%x", "root")]))
 
 	ext, ok := trie.root.(*ExtensionNode)
 	require.True(t, ok)
@@ -180,7 +180,7 @@ func TestPersistInDB(t *testing.T) {
 	require.True(t, ok)
 
 	expectedKeyValueStore := map[string][]byte{
-		fmt.Sprintf("%x", "rootHash"):    ext.Serialize(),
+		fmt.Sprintf("%x", "root"):        ext.Serialize(),
 		fmt.Sprintf("%x", branch.Hash()): branch.Serialize(),
 		fmt.Sprintf("%x", leaf.Hash()):   leaf.Serialize(),
 	}
@@ -200,7 +200,7 @@ func TestGenerateFromDB(t *testing.T) {
 	trie.PersistInDB(mockDB)
 
 	newTrie := NewTrie()
-	newTrie.GenerateFromDB(mockDB)
+	newTrie.NewTrieFromDB(mockDB)
 	require.Equal(t, trie.root.Hash(), newTrie.root.Hash())
 
 	require.True(t, reflect.DeepEqual(trie, newTrie))
