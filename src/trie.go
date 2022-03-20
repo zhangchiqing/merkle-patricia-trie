@@ -8,7 +8,7 @@ func NewTrie() *Trie {
 	return &Trie{}
 }
 
-func (t *Trie) NewTrieFromDB(db DB) {
+func (t *Trie) LoadFromDB(db DB) {
 	serializedRoot, err := db.Get([]byte("root"))
 	if err != nil {
 		panic(err)

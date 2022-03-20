@@ -106,7 +106,7 @@ func TestTransactionRLP(t *testing.T) {
 }
 
 func TransactionJSON(t *testing.T) *types.Transaction {
-	jsonFile, err := os.Open("transaction.json")
+	jsonFile, err := os.Open("../test_data/transaction.json")
 	defer jsonFile.Close()
 	require.NoError(t, err)
 	byteValue, err := ioutil.ReadAll(jsonFile)
@@ -117,7 +117,7 @@ func TransactionJSON(t *testing.T) *types.Transaction {
 }
 
 func TransactionsJSON(t *testing.T) []*types.Transaction {
-	jsonFile, err := os.Open("transactions.json")
+	jsonFile, err := os.Open("../test_data/transactions.json")
 	defer jsonFile.Close()
 	require.NoError(t, err)
 	byteValue, err := ioutil.ReadAll(jsonFile)

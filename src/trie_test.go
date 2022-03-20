@@ -200,7 +200,7 @@ func TestGenerateFromDB(t *testing.T) {
 	trie.PersistInDB(mockDB)
 
 	newTrie := NewTrie()
-	newTrie.NewTrieFromDB(mockDB)
+	newTrie.LoadFromDB(mockDB)
 	require.Equal(t, trie.root.Hash(), newTrie.root.Hash())
 
 	require.True(t, reflect.DeepEqual(trie, newTrie))
