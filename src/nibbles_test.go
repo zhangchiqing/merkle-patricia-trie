@@ -69,7 +69,7 @@ func TestToPrefixed(t *testing.T) {
 	for _, c := range cases {
 		require.Equal(t,
 			c.expected,
-			ToPrefixed(c.ns, c.isLeafNode))
+			AppendPrefixToNibbles(c.ns, c.isLeafNode))
 	}
 }
 
@@ -127,7 +127,7 @@ func TestRemovePrefix(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		nibbles, isLeafNode := RemovePrefix(c.ns)
+		nibbles, isLeafNode := RemovePrefixFromNibbles(c.ns)
 		require.Equal(t,
 			c.expected,
 			nibbles)
@@ -137,12 +137,12 @@ func TestRemovePrefix(t *testing.T) {
 
 func TestFromBytes(t *testing.T) {
 	// [1, 100] -> ['0x01', '0x64']
-	require.Equal(t, []Nibble{0, 1, 6, 4}, FromBytes([]byte{1, 100}))
+	require.Equal(t, []Nibble{0, 1, 6, 4}, NibblesFromBytes([]byte{1, 100}))
 }
 
 func TestToBytes(t *testing.T) {
 	bytes := []byte{0, 1, 2, 3}
-	require.Equal(t, bytes, ToBytes(FromBytes(bytes)))
+	require.Equal(t, bytes, NibblesToBytes(NibblesFromBytes(bytes)))
 }
 
 func TestPrefixMatchedLen(t *testing.T) {

@@ -20,7 +20,7 @@ func (t *Trie) LoadFromDB(db DB) {
 
 func (t *Trie) Get(key []byte) ([]byte, bool) {
 	node := t.root
-	nibbles := FromBytes(key)
+	nibbles := NibblesFromBytes(key)
 	for {
 		if IsEmptyNode(node) {
 			return nil, false
@@ -71,7 +71,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 	// need to use pointer, so that I can update root in place without
 	// keeping trace of the parent node
 	node := &t.root
-	nibbles := FromBytes(key)
+	nibbles := NibblesFromBytes(key)
 	for {
 		if IsEmptyNode(*node) {
 			leaf := NewLeafNodeFromNibbles(nibbles, value)

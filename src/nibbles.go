@@ -12,6 +12,7 @@ func IsNibble(nibble byte) bool {
 	return n >= 0 && n < 16
 }
 
+// TODO [Alice]: Marked for deletion.
 func FromNibbleByte(n byte) (Nibble, error) {
 	if !IsNibble(n) {
 		return 0, fmt.Errorf("non-nibble byte: %v", n)
@@ -19,7 +20,7 @@ func FromNibbleByte(n byte) (Nibble, error) {
 	return Nibble(n), nil
 }
 
-// nibbles contain one nibble per byte
+// TODO [Alice]: Marked for deletion.
 func FromNibbleBytes(nibbles []byte) ([]Nibble, error) {
 	ns := make([]Nibble, 0, len(nibbles))
 	for _, n := range nibbles {
@@ -32,28 +33,28 @@ func FromNibbleBytes(nibbles []byte) ([]Nibble, error) {
 	return ns, nil
 }
 
-func FromByte(b byte) []Nibble {
+func NibblesFromByte(b byte) []Nibble {
 	return []Nibble{
 		Nibble(byte(b >> 4)),
 		Nibble(byte(b % 16)),
 	}
 }
 
-func FromBytes(bs []byte) []Nibble {
+func NibblesFromBytes(bs []byte) []Nibble {
 	ns := make([]Nibble, 0, len(bs)*2)
 	for _, b := range bs {
-		ns = append(ns, FromByte(b)...)
+		ns = append(ns, NibblesFromByte(b)...)
 	}
 	return ns
 }
 
 func FromString(s string) []Nibble {
-	return FromBytes([]byte(s))
+	return NibblesFromBytes([]byte(s))
 }
 
-// ToPrefixed add nibble prefix to a slice of nibbles to make its length even
+// AppendPrefixToNibbles add nibble prefix to a slice of nibbles to make its length even
 // the prefix indicts whether a node is a leaf node.
-func ToPrefixed(ns []Nibble, isLeafNode bool) []Nibble {
+func AppendPrefixToNibbles(ns []Nibble, isLeafNode bool) []Nibble {
 	// create prefix
 	var prefixBytes []Nibble
 	// odd number of nibbles
@@ -79,9 +80,9 @@ func ToPrefixed(ns []Nibble, isLeafNode bool) []Nibble {
 	return prefixed
 }
 
-// RemovePrefix removes nibble prefix from a slice of nibbles and
+// RemovePrefixFromNibbles removes nibble prefix from a slice of nibbles and
 //tells if the nibbles belong to a leaf node
-func RemovePrefix(ns []Nibble) (noPrefixNs []Nibble, isLeafNode bool) {
+func RemovePrefixFromNibbles(ns []Nibble) (noPrefixNs []Nibble, isLeafNode bool) {
 
 	// From https://eth.wiki/fundamentals/patricia-tree:
 	//
@@ -111,9 +112,9 @@ func RemovePrefix(ns []Nibble) (noPrefixNs []Nibble, isLeafNode bool) {
 	panic("invalid nibble prefix")
 }
 
-// ToBytes converts a slice of nibbles to a byte slice
+// NibblesToBytes converts a slice of nibbles to a byte slice
 // assuming the nibble slice has even number of nibbles.
-func ToBytes(ns []Nibble) []byte {
+func NibblesToBytes(ns []Nibble) []byte {
 	buf := make([]byte, 0, len(ns)/2)
 
 	for i := 0; i < len(ns); i += 2 {

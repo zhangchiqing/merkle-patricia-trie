@@ -11,6 +11,7 @@ type LeafNode struct {
 	Value []byte
 }
 
+// TODO [Alice]: Marked for deletion.
 func NewLeafNodeFromNibbleBytes(nibbles []byte, value []byte) (*LeafNode, error) {
 	ns, err := FromNibbleBytes(nibbles)
 	if err != nil {
@@ -27,12 +28,9 @@ func NewLeafNodeFromNibbles(nibbles []Nibble, value []byte) *LeafNode {
 	}
 }
 
-func NewLeafNodeFromKeyValue(key, value string) *LeafNode {
-	return NewLeafNodeFromBytes([]byte(key), []byte(value))
-}
-
+// TODO [Alice]: Marked for deletion.
 func NewLeafNodeFromBytes(key, value []byte) *LeafNode {
-	return NewLeafNodeFromNibbles(FromBytes(key), value)
+	return NewLeafNodeFromNibbles(NibblesFromBytes(key), value)
 }
 
 func (l LeafNode) Hash() []byte {
@@ -40,7 +38,7 @@ func (l LeafNode) Hash() []byte {
 }
 
 func (l LeafNode) Raw() []interface{} {
-	path := ToBytes(ToPrefixed(l.Path, true))
+	path := NibblesToBytes(AppendPrefixToNibbles(l.Path, true))
 	raw := []interface{}{path, l.Value}
 	return raw
 }

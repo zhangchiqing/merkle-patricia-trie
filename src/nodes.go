@@ -33,6 +33,7 @@ func Serialize(node Node) []byte {
 	return rlp
 }
 
+// TODO [Alice]: make this return an error instead of panicking.
 func FromRaw(rawNode []interface{}, db DB) Node {
 	if len(rawNode) == 0 {
 		return nil
@@ -79,8 +80,8 @@ func FromRaw(rawNode []interface{}, db DB) Node {
 	} else {
 		// either extension node or leaf node
 		nibbleBytes := rawNode[0]
-		prefixedNibbles := FromBytes(nibbleBytes.([]byte))
-		nibbles, isLeafNode := RemovePrefix(prefixedNibbles)
+		prefixedNibbles := NibblesFromBytes(nibbleBytes.([]byte))
+		nibbles, isLeafNode := RemovePrefixFromNibbles(prefixedNibbles)
 
 		if isLeafNode {
 			leafNode := NewLeafNodeFromNibbles(nibbles, rawNode[1].([]byte))
