@@ -182,13 +182,15 @@ func TestTrieWithTwoTxs(t *testing.T) {
 
 	key, err := rlp.EncodeToBytes(uint(0))
 	require.NoError(t, err)
-	value, found := trie.Get(key)
-	fmt.Printf("==0 value: %x, found: %v\n", value, found)
+	value := trie.Get(key)
+	require.NotNil(t, value)
+	fmt.Printf("==0 value: %x\n", value)
 
 	key, err = rlp.EncodeToBytes(uint(1))
 	require.NoError(t, err)
-	value, found = trie.Get(key)
-	fmt.Printf("==1 value: %x, found: %v\n", value, found)
+	value = trie.Get(key)
+	require.NotNil(t, value)
+	fmt.Printf("==1 value: %x\n", value)
 
 	txRootHash := fmt.Sprintf("%x", types.DeriveSha(types.Transactions(txs)))
 	require.Equal(t, txRootHash, fmt.Sprintf("%x", trie.Hash()))

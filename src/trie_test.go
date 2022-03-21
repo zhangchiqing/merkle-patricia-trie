@@ -17,25 +17,23 @@ func hexEqual(t *testing.T, hex string, bytes []byte) {
 func TestGetPut(t *testing.T) {
 	t.Run("should get nothing if key does not exist", func(t *testing.T) {
 		trie := NewTrie()
-		_, found := trie.Get([]byte("notexist"))
-		require.Equal(t, false, found)
+		value := trie.Get([]byte("notexist"))
+		require.Nil(t, value)
 	})
 
 	t.Run("should get value if key exist", func(t *testing.T) {
 		trie := NewTrie()
 		trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
-		val, found := trie.Get([]byte{1, 2, 3, 4})
-		require.Equal(t, true, found)
-		require.Equal(t, val, []byte("hello"))
+		value := trie.Get([]byte{1, 2, 3, 4})
+		require.Equal(t, value, []byte("hello"))
 	})
 
 	t.Run("should get updated value", func(t *testing.T) {
 		trie := NewTrie()
 		trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 		trie.Put([]byte{1, 2, 3, 4}, []byte("world"))
-		val, found := trie.Get([]byte{1, 2, 3, 4})
-		require.Equal(t, true, found)
-		require.Equal(t, val, []byte("world"))
+		value := trie.Get([]byte{1, 2, 3, 4})
+		require.Equal(t, value, []byte("world"))
 	})
 }
 
@@ -77,12 +75,10 @@ func TestPut2Pairs(t *testing.T) {
 	trie.Put([]byte{1, 2, 3, 4}, []byte("verb"))
 	trie.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("coin"))
 
-	verb, ok := trie.Get([]byte{1, 2, 3, 4})
-	require.True(t, ok)
+	verb := trie.Get([]byte{1, 2, 3, 4})
 	require.Equal(t, []byte("verb"), verb)
 
-	coin, ok := trie.Get([]byte{1, 2, 3, 4, 5, 6})
-	require.True(t, ok)
+	coin := trie.Get([]byte{1, 2, 3, 4, 5, 6})
 	require.Equal(t, []byte("coin"), coin)
 
 	fmt.Printf("%T\n", trie.root)
@@ -168,7 +164,7 @@ func TestPersistInDB(t *testing.T) {
 
 	mockDB := NewMockDB()
 
-	trie.PersistInDB(mockDB)
+	trie.SaveToDB(mockDB)
 
 	hexEqual(t, "64d67c5318a714d08de6958c0e63a05522642f3f1087c6fd68a97837f203d359", crypto.Keccak256(mockDB.keyValueStore[fmt.Sprintf("%x", "root")]))
 
@@ -197,7 +193,7 @@ func TestGenerateFromDB(t *testing.T) {
 
 	mockDB := NewMockDB()
 
-	trie.PersistInDB(mockDB)
+	trie.SaveToDB(mockDB)
 
 	newTrie := NewTrie()
 	newTrie.LoadFromDB(mockDB)

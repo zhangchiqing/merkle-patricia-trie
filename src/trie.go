@@ -1,42 +1,45 @@
 package mpt
 
+/// Trie is an in-memory representation of a Merkle Patricia Trie using RLP-encoding.
+/// Trie supports loading data from, and saving data to, persistent storage using the
+/// `LoadFromDB` and `SaveToDB` methods.
+///
+/// Trie exposes a state-machine-type API that simplifies implementation of Veritas'
+/// fraud proof functionality. This means that generally, its functions need to be
+/// called in careful orders (depending on what the calling code is trying to do). Study
+/// `diagrams/trie_state_machine.pdf` before using this library.
 type Trie struct {
 	root Node
 }
 
+/// NewTrie returns an empty Trie.
 func NewTrie() *Trie {
 	return &Trie{}
 }
 
-func (t *Trie) LoadFromDB(db DB) {
-	serializedRoot, err := db.Get([]byte("root"))
-	if err != nil {
-		panic(err)
-	}
-
-	rootNode := Deserialize(serializedRoot, db)
-	t.root = rootNode
-}
-
-func (t *Trie) Get(key []byte) ([]byte, bool) {
+/// Get returns the value associated with key in the Trie, if it exists, and nil if does not.
+///
+/// TODO [Alice]: Clarify with Ahsan whether the second return value indicates whether
+/// or not the Get got something.
+func (t *Trie) Get(key []byte) []byte {
 	node := t.root
 	nibbles := NibblesFromBytes(key)
 	for {
 		if IsEmptyNode(node) {
-			return nil, false
+			return nil
 		}
 
 		if leaf, ok := node.(*LeafNode); ok {
 			matched := PrefixMatchedLen(leaf.Path, nibbles)
 			if matched != len(leaf.Path) || matched != len(nibbles) {
-				return nil, false
+				return nil
 			}
-			return leaf.Value, true
+			return leaf.Value
 		}
 
 		if branch, ok := node.(*BranchNode); ok {
 			if len(nibbles) == 0 {
-				return branch.Value, branch.HasValue()
+				return branch.Value
 			}
 
 			b, remaining := nibbles[0], nibbles[1:]
@@ -50,7 +53,7 @@ func (t *Trie) Get(key []byte) ([]byte, bool) {
 			// E 01020304
 			//   010203
 			if matched < len(ext.Path) {
-				return nil, false
+				return nil
 			}
 
 			nibbles = nibbles[matched:]
@@ -62,11 +65,7 @@ func (t *Trie) Get(key []byte) ([]byte, bool) {
 	}
 }
 
-// Put adds a key value pair to the trie
-// In general, the rule is:
-// - When stopped at an EmptyNode, replace it with a new LeafNode with the remaining path.
-// - When stopped at a LeafNode, convert it to an ExtensionNode and add a new branch and a new LeafNode.
-// - When stopped at an ExtensionNode, convert it to another ExtensionNode with shorter path and create a new BranchNode points to the ExtensionNode.
+/// Put adds a key value pair to the Trie.
 func (t *Trie) Put(key []byte, value []byte) {
 	// need to use pointer, so that I can update root in place without
 	// keeping trace of the parent node
@@ -193,17 +192,25 @@ func (t *Trie) Put(key []byte, value []byte) {
 
 		panic("unknown type")
 	}
-
 }
 
-func (t *Trie) Hash() []byte {
-	if IsEmptyNode(t.root) {
-		return EmptyNodeHash
+/// LoadFromDB populates the Trie with data from db. It returns an error if db
+/// does not contain the key "root".
+func (t *Trie) LoadFromDB(db DB) error {
+	serializedRoot, err := db.Get([]byte("root"))
+	if err != nil {
+		return err
 	}
-	return t.root.Hash()
+
+	rootNode := Deserialize(serializedRoot, db)
+	t.root = rootNode
+
+	return nil
 }
 
-func (t *Trie) PersistInDB(db DB) {
+/// SaveToDB saves the Trie into db. At the end of this operation, the root of
+/// the Trie is stored in key "root".
+func (t *Trie) SaveToDB(db DB) {
 	nodes := []Node{t.root}
 	currentNode := (Node)(nil)
 
@@ -248,4 +255,12 @@ func (t *Trie) PersistInDB(db DB) {
 	// TODO [Alice]: Ask Ahsan why we delete rootHash.
 	db.Delete(rootHash)
 	db.Put([]byte("root"), Serialize(t.root))
+}
+
+/// Hash returns the root hash of the Trie.
+func (t *Trie) Hash() []byte {
+	if IsEmptyNode(t.root) {
+		return EmptyNodeHash
+	}
+	return t.root.Hash()
 }
