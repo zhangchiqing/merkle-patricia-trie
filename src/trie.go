@@ -8,10 +8,10 @@ import "fmt"
 ///
 /// Trie exposes a state-machine-type API that simplifies implementation of Veritas'
 /// fraud proof functionality. This means that generally, its functions need to be
-/// called in careful orders (depending on what the calling code is trying to do). Study
-/// `diagrams/trie_state_machine.pdf` before using this library.
+/// called in careful orders (depending on what the calling code is trying to do).
 ///
-/// A brief overview of useful sequence flows for using Trie:
+/// # Usage
+///
 /// 1. Normal mode:
 ///    Op 1. NewTrie(mode: MODE_NORMAL)
 ///    Op 2. LoadFromDB()
@@ -37,6 +37,7 @@ import "fmt"
 ///    Op 7. if state_root == published_state_root
 ///          then do nothing
 ///          else disable the rollup
+///
 type Trie struct {
 	root Node
 	mode TrieMode
@@ -121,9 +122,12 @@ func (t *Trie) GetPreAndPseudoPostState() (PreState, PseudoPostState) {
 }
 
 /// Put adds a key value pair to the Trie.
+///
+/// # Panics
+/// This method panics if called when t.mode != MODE_NORMAL || MODE_GENERATE_FRAUD_PROOF || MODE_VERIFY_FRAUD_PROOF.
 func (t *Trie) Put(key []byte, value []byte) {
-	if t.mode == MODE_DEAD {
-		panic("attempted to use dead Trie. Read Trie documentation.")
+	if t.mode != MODE_NORMAL && t.mode != MODE_GENERATE_FRAUD_PROOF && t.mode != MODE_VERIFY_FRAUD_PROOF {
+		panic("")
 	}
 
 	// need to use pointer, so that I can update root in place without
@@ -339,6 +343,7 @@ func (t *Trie) SaveToDB(db DB) {
 	}
 
 	rootHash := t.root.Hash()
+
 	// TOD0 [Alice]: Ask Ahsan why these two lines (it /was/ two lines when
 	// WriteBatch was still a thing) were originally swapped.
 	//
