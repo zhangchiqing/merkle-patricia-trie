@@ -16,20 +16,20 @@ func hexEqual(t *testing.T, hex string, bytes []byte) {
 // check basic key-value mapping
 func TestGetPut(t *testing.T) {
 	t.Run("should get nothing if key does not exist", func(t *testing.T) {
-		trie := NewTrie()
+		trie := NewTrie(MODE_NORMAL)
 		value := trie.Get([]byte("notexist"))
 		require.Nil(t, value)
 	})
 
 	t.Run("should get value if key exist", func(t *testing.T) {
-		trie := NewTrie()
+		trie := NewTrie(MODE_NORMAL)
 		trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 		value := trie.Get([]byte{1, 2, 3, 4})
 		require.Equal(t, value, []byte("hello"))
 	})
 
 	t.Run("should get updated value", func(t *testing.T) {
-		trie := NewTrie()
+		trie := NewTrie(MODE_NORMAL)
 		trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 		trie.Put([]byte{1, 2, 3, 4}, []byte("world"))
 		value := trie.Get([]byte{1, 2, 3, 4})
@@ -40,7 +40,7 @@ func TestGetPut(t *testing.T) {
 // verify data integrity
 func TestDataIntegrity(t *testing.T) {
 	t.Run("should get a different hash if a new key-value pair was added or updated", func(t *testing.T) {
-		trie := NewTrie()
+		trie := NewTrie(MODE_NORMAL)
 		hash0 := trie.Hash()
 
 		trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
@@ -58,11 +58,11 @@ func TestDataIntegrity(t *testing.T) {
 	})
 
 	t.Run("should get the same hash if two tries have the identicial key-value pairs", func(t *testing.T) {
-		trie1 := NewTrie()
+		trie1 := NewTrie(MODE_NORMAL)
 		trie1.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 		trie1.Put([]byte{1, 2}, []byte("world"))
 
-		trie2 := NewTrie()
+		trie2 := NewTrie(MODE_NORMAL)
 		trie2.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 		trie2.Put([]byte{1, 2}, []byte("world"))
 
@@ -71,7 +71,7 @@ func TestDataIntegrity(t *testing.T) {
 }
 
 func TestPut2Pairs(t *testing.T) {
-	trie := NewTrie()
+	trie := NewTrie(MODE_NORMAL)
 	trie.Put([]byte{1, 2, 3, 4}, []byte("verb"))
 	trie.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("coin"))
 
@@ -84,9 +84,9 @@ func TestPut2Pairs(t *testing.T) {
 	fmt.Printf("%T\n", trie.root)
 	ext, ok := trie.root.(*ExtensionNode)
 	require.True(t, ok)
-	branch, ok := ext.Next.(*BranchNode)
+	branch, ok := ext.next.(*BranchNode)
 	require.True(t, ok)
-	leaf, ok := branch.Branches[0].(*LeafNode)
+	leaf, ok := branch.branches[0].(*LeafNode)
 	require.True(t, ok)
 
 	hexEqual(t, "c37ec985b7a88c2c62beb268750efe657c36a585beb435eb9f43b839846682ce", leaf.Hash())
@@ -96,7 +96,7 @@ func TestPut2Pairs(t *testing.T) {
 }
 
 func TestPut(t *testing.T) {
-	trie := NewTrie()
+	trie := NewTrie(MODE_NORMAL)
 	require.Equal(t, EmptyNodeHash, trie.Hash())
 	trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 	ns := NewLeafNodeFromBytes([]byte{1, 2, 3, 4}, []byte("hello"))
@@ -104,7 +104,7 @@ func TestPut(t *testing.T) {
 }
 
 func TestPutLeafShorter(t *testing.T) {
-	trie := NewTrie()
+	trie := NewTrie(MODE_NORMAL)
 	trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 	trie.Put([]byte{1, 2, 3}, []byte("world"))
 
@@ -120,7 +120,7 @@ func TestPutLeafShorter(t *testing.T) {
 }
 
 func TestPutLeafAllMatched(t *testing.T) {
-	trie := NewTrie()
+	trie := NewTrie(MODE_NORMAL)
 	trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 	trie.Put([]byte{1, 2, 3, 4}, []byte("world"))
 
@@ -129,7 +129,7 @@ func TestPutLeafAllMatched(t *testing.T) {
 }
 
 func TestPutLeafMore(t *testing.T) {
-	trie := NewTrie()
+	trie := NewTrie(MODE_NORMAL)
 	trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 	trie.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("world"))
 
@@ -145,7 +145,7 @@ func TestPutLeafMore(t *testing.T) {
 }
 
 func TestPutOrder(t *testing.T) {
-	trie1, trie2 := NewTrie(), NewTrie()
+	trie1, trie2 := NewTrie(MODE_NORMAL), NewTrie(MODE_NORMAL)
 
 	trie1.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("world"))
 	trie1.Put([]byte{1, 2, 3, 4}, []byte("hello"))
@@ -157,7 +157,7 @@ func TestPutOrder(t *testing.T) {
 }
 
 func TestPersistInDB(t *testing.T) {
-	trie := NewTrie()
+	trie := NewTrie(MODE_NORMAL)
 
 	trie.Put([]byte{1, 2, 3, 4}, []byte("verb"))
 	trie.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("coin"))
@@ -170,9 +170,9 @@ func TestPersistInDB(t *testing.T) {
 
 	ext, ok := trie.root.(*ExtensionNode)
 	require.True(t, ok)
-	branch, ok := ext.Next.(*BranchNode)
+	branch, ok := ext.next.(*BranchNode)
 	require.True(t, ok)
-	leaf, ok := branch.Branches[0].(*LeafNode)
+	leaf, ok := branch.branches[0].(*LeafNode)
 	require.True(t, ok)
 
 	expectedKeyValueStore := map[string][]byte{
@@ -185,7 +185,7 @@ func TestPersistInDB(t *testing.T) {
 }
 
 func TestGenerateFromDB(t *testing.T) {
-	trie := NewTrie()
+	trie := NewTrie(MODE_NORMAL)
 
 	trie.Put([]byte{1, 2, 3, 4}, []byte("verb"))
 	trie.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("coin"))
@@ -195,7 +195,7 @@ func TestGenerateFromDB(t *testing.T) {
 
 	trie.SaveToDB(mockDB)
 
-	newTrie := NewTrie()
+	newTrie := NewTrie(MODE_NORMAL)
 	newTrie.LoadFromDB(mockDB)
 	require.Equal(t, trie.root.Hash(), newTrie.root.Hash())
 

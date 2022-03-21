@@ -19,9 +19,9 @@ func TestDeserializeNodes(t *testing.T) {
 		leafNode2 := NewLeafNodeFromNibbles([]Nibble{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, []byte("helloworldgoodmorning"))
 		require.True(t, len(Serialize(leafNode2)) >= 32)
 
-		branchNode.Branches[0] = leafNode1
-		branchNode.Branches[3] = leafNode2
-		branchNode.Value = []byte("VEGETA")
+		branchNode.branches[0] = leafNode1
+		branchNode.branches[3] = leafNode2
+		branchNode.value = []byte("VEGETA")
 
 		mockDB := NewMockDB()
 		mockDB.Put(leafNode2.Hash(), leafNode2.Serialize())
@@ -39,9 +39,9 @@ func TestDeserializeNodes(t *testing.T) {
 		leafNode2 := NewLeafNodeFromNibbles([]Nibble{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, []byte("helloworldgoodmorning"))
 		require.True(t, len(Serialize(leafNode2)) >= 32)
 
-		branchNode.Branches[0] = leafNode1
-		branchNode.Branches[3] = leafNode2
-		branchNode.Value = []byte("GOKU")
+		branchNode.branches[0] = leafNode1
+		branchNode.branches[3] = leafNode2
+		branchNode.value = []byte("GOKU")
 
 		mockDB := NewMockDB()
 
@@ -54,7 +54,7 @@ func TestDeserializeNodes(t *testing.T) {
 		nextNode := NewLeafNodeFromNibbles([]Nibble{10, 10}, []byte("h"))
 		require.True(t, len(Serialize(nextNode)) < 32)
 
-		extensionNode.Next = nextNode
+		extensionNode.next = nextNode
 		mockDB := NewMockDB()
 
 		serializedExtensionNode := extensionNode.Serialize()
@@ -67,7 +67,7 @@ func TestDeserializeNodes(t *testing.T) {
 		nextNode := NewLeafNodeFromNibbles([]Nibble{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, []byte("helloworldgoodmorning"))
 		require.True(t, len(Serialize(nextNode)) >= 32)
 
-		extensionNode.Next = nextNode
+		extensionNode.next = nextNode
 		mockDB := NewMockDB()
 		mockDB.Put(nextNode.Hash(), nextNode.Serialize())
 
@@ -81,7 +81,7 @@ func TestDeserializeNodes(t *testing.T) {
 		nextNode := NewLeafNodeFromNibbles([]Nibble{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, []byte("helloworldgoodmorning"))
 		require.True(t, len(Serialize(nextNode)) >= 32)
 
-		extensionNode.Next = nextNode
+		extensionNode.next = nextNode
 		mockDB := NewMockDB()
 
 		serializedExtensionNode := extensionNode.Serialize()
@@ -93,10 +93,10 @@ func TestDeserializeNodes(t *testing.T) {
 		next1 := NewExtensionNode([]Nibble{2, 3}, nil)
 		leaf := NewLeafNodeFromNibbles([]Nibble{3}, []byte("a"))
 
-		next1.Next = leaf
+		next1.next = leaf
 		require.Less(t, len(next1.Serialize()), 32)
 
-		ext1.Next = next1
+		ext1.next = next1
 
 		mockDB := NewMockDB()
 

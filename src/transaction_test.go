@@ -19,7 +19,7 @@ import (
 
 func TestTransactionRootAndProof(t *testing.T) {
 
-	trie := NewTrie()
+	trie := NewTrie(MODE_NORMAL)
 
 	txs := TransactionsJSON(t)
 
@@ -152,7 +152,7 @@ func TestTrieWithOneTx(t *testing.T) {
 	rlp, err := transaction.GetRLP()
 	require.NoError(t, err)
 
-	trie := NewTrie()
+	trie := NewTrie(MODE_NORMAL)
 	trie.Put(key, rlp)
 
 	txRootHash := fmt.Sprintf("%x", types.DeriveSha(types.Transactions{tx}))
@@ -166,7 +166,7 @@ func TestTrieWithTwoTxs(t *testing.T) {
 
 	fmt.Printf("tx0: %x\n", types.Transactions(txs).GetRlp(0))
 	fmt.Printf("tx1: %x\n", types.Transactions(txs).GetRlp(1))
-	trie := NewTrie()
+	trie := NewTrie(MODE_NORMAL)
 	for i, tx := range txs {
 		key, err := rlp.EncodeToBytes(uint(i))
 		require.NoError(t, err)
@@ -197,7 +197,7 @@ func TestTrieWithTwoTxs(t *testing.T) {
 }
 
 func TestTrieWithHash(t *testing.T) {
-	trie := NewTrie()
+	trie := NewTrie(MODE_NORMAL)
 	key0, err := rlp.EncodeToBytes(uint(0))
 	require.NoError(t, err)
 	key1, err := rlp.EncodeToBytes(uint(1))
@@ -214,7 +214,7 @@ func TestTrieWithHash(t *testing.T) {
 func TestTrieWithBlockTxs(t *testing.T) {
 	txs := TransactionsJSON(t)
 
-	trie := NewTrie()
+	trie := NewTrie(MODE_NORMAL)
 	for i, tx := range txs {
 		key, err := rlp.EncodeToBytes(uint(i))
 		require.NoError(t, err)
@@ -233,7 +233,7 @@ func TestTrieWithBlockTxs(t *testing.T) {
 }
 
 func Test130Items(t *testing.T) {
-	trie := NewTrie()
+	trie := NewTrie(MODE_NORMAL)
 	value, _ := hex.DecodeString("80")
 	for i := 0; i < 250; i++ {
 		key, err := rlp.EncodeToBytes(uint(i))

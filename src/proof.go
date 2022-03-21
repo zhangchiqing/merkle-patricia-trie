@@ -72,8 +72,8 @@ func (t *Trie) Prove(key []byte) (Proof, bool) {
 		}
 
 		if leaf, ok := node.(*LeafNode); ok {
-			matched := PrefixMatchedLen(leaf.Path, nibbles)
-			if matched != len(leaf.Path) || matched != len(nibbles) {
+			matched := PrefixMatchedLen(leaf.path, nibbles)
+			if matched != len(leaf.path) || matched != len(nibbles) {
 				return nil, false
 			}
 
@@ -87,20 +87,20 @@ func (t *Trie) Prove(key []byte) (Proof, bool) {
 
 			b, remaining := nibbles[0], nibbles[1:]
 			nibbles = remaining
-			node = branch.Branches[b]
+			node = branch.branches[b]
 			continue
 		}
 
 		if ext, ok := node.(*ExtensionNode); ok {
-			matched := PrefixMatchedLen(ext.Path, nibbles)
+			matched := PrefixMatchedLen(ext.path, nibbles)
 			// E 01020304
 			//   010203
-			if matched < len(ext.Path) {
+			if matched < len(ext.path) {
 				return nil, false
 			}
 
 			nibbles = nibbles[matched:]
-			node = ext.Next
+			node = ext.next
 			continue
 		}
 

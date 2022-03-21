@@ -15,7 +15,7 @@ func AreEqualTries(root1 Node, root2 Node) bool {
 	root2Ext, root2IsExt := root2.(*ExtensionNode)
 
 	if root1IsExt && root2IsExt {
-		res := reflect.DeepEqual(root1Ext.Path, root2Ext.Path) && AreEqualTries(root1Ext.Next, root2Ext.Next)
+		res := reflect.DeepEqual(root1Ext.path, root2Ext.path) && AreEqualTries(root1Ext.next, root2Ext.next)
 		if res == false {
 			fmt.Println(root1Ext, root2Ext)
 		}
@@ -28,12 +28,12 @@ func AreEqualTries(root1 Node, root2 Node) bool {
 	if root1IsBranch && root2IsBranch {
 		areBranchesEqual := true
 		for i := 0; i < 16; i++ {
-			areBranchesEqual = areBranchesEqual && AreEqualTries(root1Branch.Branches[i], root2Branch.Branches[i])
+			areBranchesEqual = areBranchesEqual && AreEqualTries(root1Branch.branches[i], root2Branch.branches[i])
 		}
 
-		res := areBranchesEqual && reflect.DeepEqual(root1Branch.Value, root2Branch.Value)
+		res := areBranchesEqual && reflect.DeepEqual(root1Branch.value, root2Branch.value)
 		if res == false {
-			fmt.Println(root1Branch, root2Branch, root1Branch.Value == nil, root2Branch.Value == nil)
+			fmt.Println(root1Branch, root2Branch, root1Branch.value == nil, root2Branch.value == nil)
 		}
 		return res
 	}
@@ -42,7 +42,7 @@ func AreEqualTries(root1 Node, root2 Node) bool {
 	root2Leaf, root2IsLeaf := root2.(*LeafNode)
 
 	if root1IsLeaf && root2IsLeaf {
-		res := reflect.DeepEqual(root1Leaf.Path, root2Leaf.Path) && reflect.DeepEqual(root1Leaf.Value, root2Leaf.Value)
+		res := reflect.DeepEqual(root1Leaf.path, root2Leaf.path) && reflect.DeepEqual(root1Leaf.value, root2Leaf.value)
 		if res == false {
 			fmt.Println(root1Leaf, root2Leaf)
 		}

@@ -23,12 +23,12 @@ func TestEthProof(t *testing.T) {
 }
 
 func TestMyTrie(t *testing.T) {
-	tr := NewTrie()
+	tr := NewTrie(MODE_NORMAL)
 	tr.Put([]byte{1, 2, 3}, []byte("hello"))
 	tr.Put([]byte{1, 2, 3, 4, 5}, []byte("world"))
 	n0, ok := tr.root.(*ExtensionNode)
 	require.True(t, ok)
-	n1, ok := n0.Next.(*BranchNode)
+	n1, ok := n0.next.(*BranchNode)
 	require.True(t, ok)
 	fmt.Printf("n0 hash: %x, Serialized: %x\n", n0.Hash(), n0.Serialize())
 	fmt.Printf("n1 hash: %x, Serialized: %x\n", n1.Hash(), n1.Serialize())
@@ -36,7 +36,7 @@ func TestMyTrie(t *testing.T) {
 
 func TestProveAndVerifyProof(t *testing.T) {
 	t.Run("should not generate proof for non-exist key", func(t *testing.T) {
-		tr := NewTrie()
+		tr := NewTrie(MODE_NORMAL)
 		tr.Put([]byte{1, 2, 3}, []byte("hello"))
 		tr.Put([]byte{1, 2, 3, 4, 5}, []byte("world"))
 		notExistKey := []byte{1, 2, 3, 4}
@@ -45,7 +45,7 @@ func TestProveAndVerifyProof(t *testing.T) {
 	})
 
 	t.Run("should generate a proof for an existing key, the proof can be verified with the merkle root hash", func(t *testing.T) {
-		tr := NewTrie()
+		tr := NewTrie(MODE_NORMAL)
 		tr.Put([]byte{1, 2, 3}, []byte("hello"))
 		tr.Put([]byte{1, 2, 3, 4, 5}, []byte("world"))
 
@@ -64,7 +64,7 @@ func TestProveAndVerifyProof(t *testing.T) {
 	})
 
 	t.Run("should fail the verification of the trie was updated", func(t *testing.T) {
-		tr := NewTrie()
+		tr := NewTrie(MODE_NORMAL)
 		tr.Put([]byte{1, 2, 3}, []byte("hello"))
 		tr.Put([]byte{1, 2, 3, 4, 5}, []byte("world"))
 
