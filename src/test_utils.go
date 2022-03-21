@@ -5,7 +5,7 @@ import (
 	"reflect"
 )
 
-// debug equality of two tries
+// AreEqualTries returns whether the trie rooted in root1 equals the trie rooted in root2.
 func AreEqualTries(root1 Node, root2 Node) bool {
 	if root1 == nil && root2 == nil {
 		return true
