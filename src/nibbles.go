@@ -12,7 +12,6 @@ func IsNibble(nibble byte) bool {
 	return n >= 0 && n < 16
 }
 
-// TODO [Alice]: Marked for deletion.
 func FromNibbleByte(n byte) (Nibble, error) {
 	if !IsNibble(n) {
 		return 0, fmt.Errorf("non-nibble byte: %v", n)
@@ -20,7 +19,6 @@ func FromNibbleByte(n byte) (Nibble, error) {
 	return Nibble(n), nil
 }
 
-// TODO [Alice]: Marked for deletion.
 func FromNibbleBytes(nibbles []byte) ([]Nibble, error) {
 	ns := make([]Nibble, 0, len(nibbles))
 	for _, n := range nibbles {
