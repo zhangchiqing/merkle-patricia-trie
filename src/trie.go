@@ -58,7 +58,7 @@ const (
 
 /// NewTrie returns an empty Trie in the specified, immutable mode.
 func NewTrie(mode TrieMode) *Trie {
-	if mode != MODE_NORMAL || mode != MODE_GENERATE_FRAUD_PROOF || mode != MODE_VERIFY_FRAUD_PROOF {
+	if mode != MODE_NORMAL && mode != MODE_GENERATE_FRAUD_PROOF && mode != MODE_VERIFY_FRAUD_PROOF {
 		panic("attempted to create a new trie with an invalid mode.")
 	}
 
