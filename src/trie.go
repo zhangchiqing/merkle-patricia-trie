@@ -173,22 +173,12 @@ func (t *Trie) Put(key []byte, value []byte) {
 			}
 
 			if matched < len(leaf.path) {
-				// have dismatched
-				// L 01020304 hello
-				// + 010203   world
-
-				// 01020304, 0, 4
 				branchNibble, leafNibbles := leaf.path[matched], leaf.path[matched+1:]
 				newLeaf := NewLeafNodeFromNibbles(leafNibbles, leaf.value) // not :matched+1
 				branch.SetBranch(branchNibble, newLeaf)
 			}
 
 			if matched < len(nibbles) {
-				// L 01020304 hello
-				// + 010203040 world
-
-				// L 01020304 hello
-				// + 010203040506 world
 				branchNibble, leafNibbles := nibbles[matched], nibbles[matched+1:]
 				newLeaf := NewLeafNodeFromNibbles(leafNibbles, value)
 				branch.SetBranch(branchNibble, newLeaf)
