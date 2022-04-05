@@ -1,5 +1,6 @@
 use crate::{Hash, NULL_HASH};
 
+#[derive(Clone)]
 pub enum Node {
     BranchNode { 
         // 16 slots, because hexadecimal is base-16.

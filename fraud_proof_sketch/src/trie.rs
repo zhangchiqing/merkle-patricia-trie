@@ -54,7 +54,7 @@ impl TrieCaptureFraudProof {
     fn put_as_normal(&self, key: &Vec<u8>, value: &Vec<u8>) { todo!() }
 
     // Methods used in PreState computation.
-    fn collect_proof_nodes_for_get(&self, get_key: &Vec<u8>) -> Vec<Node> { todo!() }
+    fn collect_proof_nodes_for_get(&self, get_key: &Vec<u8>) -> Vec<(Vec<u8>, Hash)> { todo!() }
 
     fn minimize_pre_state(&self, pps: &mut PreStateAndPostState) { 
         let trusted_nodes: HashSet<Hash> = HashSet::new();
@@ -107,8 +107,8 @@ pub(crate) struct PreStateAndPostState {
     pub pre_state: (
         // Vector of (Key, Value) read pairs.
         Vec<(Vec<u8>, Vec<u8>)>,
-        // Vector of ProofNodes.
-        Vec<Node>,
+        // Vector of (Key, Hash) pairs used to produce ProofNodes.
+        Vec<(Vec<u8>, Hash)>,
     ),
 
     // Vector of vector of ProofNodes. Each vector of ProofNodes
@@ -135,8 +135,58 @@ impl PreStateAndPostState {
 pub struct TrieVerifyFraudProof {
     root: Node,
     db: TrieDB,
+
+    post_state: Vec<Vec<(Vec<u8>, Hash)>>,
+    put_count: usize,
+}
+
+impl TrieVerifyFraudProof {
+    fn get_as_normal(&self, key: &Vec<u8>) -> Vec<u8> { todo!() }
+
+    fn put_as_normal(&self, key: &Vec<u8>, value: &Vec<u8>) { todo!() }
+
+    fn get_root_hash(&self) { todo!() }
+
+    fn put_proof_node(&self, key: &Vec<u8>, hash: Hash) { todo!() }
+
+    fn get_stray_trie_root_of_put(&self, put_key: &Vec<u8>) -> (Nibbles, Node) { todo!() }
 }
 
 impl Trie for TrieVerifyFraudProof {
-    fn get()
+    fn get(&mut self, key: Vec<u8>) -> Vec<u8> { 
+        todo!();
+        // TODO [Alice]: WasPreStateComplete enforcement.
+
+        self.get_as_normal(&key)
+    }
+    
+    fn put(&mut self, key: Vec<u8>, value: Vec<u8>) {
+        let proof_node_precursors = self.post_state[self.put_count].clone();
+        let (nibble_to_stray_trie, stray_trie_root) = self.get_stray_trie_root_of_put(&key);
+        let stray_trie_hash_before_loading_proof_nodes = stray_trie_root.hash();
+
+        // Load proof nodes.
+        for (key, proof_node) in proof_node_precursors {
+            if !b_extends_a(&key_as_nibbles(key.clone()), &nibble_to_stray_trie) {
+                panic!("a put's post state proof nodes need to be children of its stray trie.")
+            }
+
+            self.put_proof_node(&key, proof_node);
+        }
+
+        let stray_trie_hash_after_loading_proof_nodes = stray_trie_root.hash();
+        if stray_trie_hash_before_loading_proof_nodes != stray_trie_hash_after_loading_proof_nodes {
+            panic!("a put's post state proof nodes should not change its stray trie's hash")
+        }
+
+        self.put_as_normal(&key, &value);
+    }
 }
+
+// Helpful definitions
+
+type Nibbles = Vec<u8>;
+
+fn key_as_nibbles(key: Vec<u8>) -> Nibbles { todo!() }
+
+fn b_extends_a(a: &Nibbles, b: &Nibbles) -> bool { todo!() }
