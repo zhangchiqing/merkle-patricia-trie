@@ -50,90 +50,7 @@ func Serialize(node Node) []byte {
 	return rlp
 }
 
-// TODO [Alice]: make this return an error instead of panicking.
-func FromRaw(rawNode []interface{}, db DB) Node {
-	if len(rawNode) == 0 {
-		return nil
-	}
-
-	if len(rawNode) == 17 {
-		//it's a branch node
-		branchNode := NewBranchNode()
-
-		for i := 0; i < 16; i++ {
-			rawBranch := rawNode[i]
-			if rawBranchBytes, ok := rawBranch.([]byte); ok {
-				if len(rawBranchBytes) != 0 {
-					// Keccak256 hash
-					serializedNodeFromDB, err := db.Get(rawBranchBytes)
-					if err != nil {
-						panic(err)
-					} else {
-						deserializedNode := Deserialize(serializedNodeFromDB, db)
-						branchNode.branches[i] = deserializedNode
-					}
-				}
-			} else if rawBranchBytes, ok := rawBranch.([]interface{}); ok {
-				// raw node itself
-				if len(rawBranchBytes) != 0 {
-					deserializedNode := FromRaw(rawBranchBytes, db)
-					branchNode.branches[i] = deserializedNode
-				}
-			} else {
-				panic("can not deserialize/decode this node")
-			}
-		}
-
-		if value, ok := rawNode[16].([]byte); ok {
-			if len(value) == 0 {
-				branchNode.value = nil
-			} else {
-				branchNode.value = value
-			}
-		} else {
-			panic("value of branch node not understood")
-		}
-		return branchNode
-	} else {
-		// either extension node or leaf node
-		nibbleBytes := rawNode[0]
-		prefixedNibbles := NibblesFromBytes(nibbleBytes.([]byte))
-		nibbles, isLeafNode := RemovePrefixFromNibbles(prefixedNibbles)
-
-		if isLeafNode {
-			leafNode := NewLeafNodeFromNibbles(nibbles, rawNode[1].([]byte))
-			return leafNode
-		} else {
-			extensionNode := NewExtensionNode(nibbles, nil)
-			rawNextNode := rawNode[1]
-
-			if rawNextNodeBytes, ok := rawNextNode.([]byte); ok {
-				if len(rawNextNodeBytes) != 0 {
-					// Keccak256 hash
-					serializedNodeFromDB, err := db.Get(rawNextNodeBytes)
-					if err != nil {
-						panic(err)
-					} else {
-						deserializedNode := Deserialize(serializedNodeFromDB, db)
-						extensionNode.next = deserializedNode
-					}
-				}
-			} else if rawNextNodeBytes, ok := rawNextNode.([]interface{}); ok {
-				// raw node itself
-				if len(rawNextNodeBytes) != 0 {
-					deserializedNode := FromRaw(rawNextNodeBytes, db)
-					extensionNode.next = deserializedNode
-				}
-			} else {
-				panic("can not deserialize/decode this node")
-			}
-
-			return extensionNode
-		}
-	}
-}
-
-func Deserialize(serializedNode []byte, db DB) Node {
+func Deserialize(serializedNode []byte, db DB) (Node, error) {
 	var rawNode []interface{}
 	err := rlp.DecodeBytes(serializedNode, &rawNode)
 
@@ -142,6 +59,113 @@ func Deserialize(serializedNode []byte, db DB) Node {
 	}
 
 	return FromRaw(rawNode, db)
+}
+
+// TODO [Alice]: explain the difference between a node and a serializedNode.
+func FromRaw(node []interface{}, db DB) (Node, error) {
+	if len(node) == 0 {
+		return nil, fmt.Errorf("serializedNode is empty.")
+	}
+
+	if len(node) == 17 {
+		////////////////////
+		// Is a BranchNode.
+		////////////////////
+		branchNode := NewBranchNode()
+
+		for i := 0; i < 16; i++ {
+			rawBranch := node[i]
+			if rawBranchBytes, ok := rawBranch.([]byte); ok {
+				if len(rawBranchBytes) != 0 {
+					serializedNodeFromDB, err := db.Get(rawBranchBytes)
+					// SAFETY: failing to get from database is a fatal error.
+					if err != nil {
+						panic(err)
+					}
+
+					deserializedNode, err := Deserialize(serializedNodeFromDB, db)
+					if err != nil {
+						return nil, err
+					}
+
+					branchNode.branches[i] = deserializedNode
+				}
+			} else if rawBranchBytes, ok := rawBranch.([]interface{}); ok {
+				if len(rawBranchBytes) != 0 {
+					deserializedNode, err := FromRaw(rawBranchBytes, db)
+					if err != nil {
+						return nil, err
+					}
+
+					branchNode.branches[i] = deserializedNode
+				}
+			} else {
+				return nil, fmt.Errorf("cannot deserialize node. TODO [Alice]: provide a reason.")
+			}
+		}
+
+		if value, ok := node[16].([]byte); ok {
+			if len(value) == 0 {
+				branchNode.value = nil
+			} else {
+				branchNode.value = value
+			}
+		} else {
+			return nil, fmt.Errorf("cannot deserialize value.")
+		}
+
+		return branchNode, nil
+	} else {
+		// Either extension node or leaf node
+		nibbleBytes := node[0]
+		prefixedNibbles := NewNibblesFromBytes(nibbleBytes.([]byte))
+		nibbles, isLeafNode := RemovePrefixFromNibbles(prefixedNibbles)
+
+		if isLeafNode {
+			///////////////////
+			// Is a LeafNode.
+			///////////////////
+			leafNode := NewLeafNodeFromNibbles(nibbles, node[1].([]byte))
+			return leafNode, nil
+
+		} else {
+			////////////////////////
+			// Is an ExtensionNode.
+			////////////////////////
+			extensionNode := NewExtensionNode(nibbles, nil)
+			rawNextNode := node[1]
+
+			if rawNextNodeBytes, ok := rawNextNode.([]byte); ok {
+				if len(rawNextNodeBytes) != 0 {
+					serializedNodeFromDB, err := db.Get(rawNextNodeBytes)
+					// SAFETY: failing to get from database is a fatal error.
+					if err != nil {
+						panic(err)
+					}
+
+					deserializedNode, err := Deserialize(serializedNodeFromDB, db)
+					if err != nil {
+						return nil, err
+					}
+					extensionNode.next = deserializedNode
+				}
+			} else if rawNextNodeBytes, ok := rawNextNode.([]interface{}); ok {
+				// raw node itself
+				if len(rawNextNodeBytes) != 0 {
+					deserializedNode, err := FromRaw(rawNextNodeBytes, db)
+					if err != nil {
+						return nil, err
+					}
+
+					extensionNode.next = deserializedNode
+				}
+			} else {
+				panic("can not deserialize/decode this node")
+			}
+
+			return extensionNode, nil
+		}
+	}
 }
 
 //////////////////////////
@@ -241,7 +265,7 @@ func (e ExtensionNode) Hash() []byte {
 
 func (e ExtensionNode) Raw() []interface{} {
 	hashes := make([]interface{}, 2)
-	hashes[0] = NibblesToBytes(AppendPrefixToNibbles(e.path, false))
+	hashes[0] = ConvertNibblesToBytes(AppendPrefixToNibbles(e.path, false))
 	if len(Serialize(e.next)) >= 32 {
 		hashes[1] = e.next.Hash()
 	} else {
@@ -265,7 +289,7 @@ type LeafNode struct {
 
 // TODO [Alice]: Marked for deletion.
 func NewLeafNodeFromNibbleBytes(nibbles []byte, value []byte) (*LeafNode, error) {
-	ns, err := FromNibbleBytes(nibbles)
+	ns, err := CastBytesToNibbles(nibbles)
 	if err != nil {
 		return nil, fmt.Errorf("could not leaf node from nibbles: %w", err)
 	}
@@ -282,7 +306,7 @@ func NewLeafNodeFromNibbles(nibbles []Nibble, value []byte) *LeafNode {
 
 // TODO [Alice]: Marked for deletion.
 func NewLeafNodeFromBytes(key, value []byte) *LeafNode {
-	return NewLeafNodeFromNibbles(NibblesFromBytes(key), value)
+	return NewLeafNodeFromNibbles(NewNibblesFromBytes(key), value)
 }
 
 func (l LeafNode) Hash() []byte {
@@ -290,7 +314,7 @@ func (l LeafNode) Hash() []byte {
 }
 
 func (l LeafNode) Raw() []interface{} {
-	path := NibblesToBytes(AppendPrefixToNibbles(l.path, true))
+	path := ConvertNibblesToBytes(AppendPrefixToNibbles(l.path, true))
 	raw := []interface{}{path, l.value}
 	return raw
 }
@@ -299,11 +323,11 @@ func (l LeafNode) Serialize() []byte {
 	return Serialize(l)
 }
 
-///////////////////////////
-// Pseudo node definitions
-///////////////////////////
+//////////////////////////
+// ProofNode definitions
+//////////////////////////
 
-type PseudoNode struct {
+type ProofNode struct {
 	path []Nibble
 	hash []byte
 }

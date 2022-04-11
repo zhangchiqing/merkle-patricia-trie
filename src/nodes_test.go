@@ -27,7 +27,8 @@ func TestDeserializeNodes(t *testing.T) {
 		mockDB.Put(leafNode2.Hash(), leafNode2.Serialize())
 
 		serializedBranchNode := branchNode.Serialize()
-		deserializedBranchNode := Deserialize(serializedBranchNode, mockDB)
+		deserializedBranchNode, err := Deserialize(serializedBranchNode, mockDB)
+		require.Nil(t, err)
 		require.True(t, reflect.DeepEqual(deserializedBranchNode, branchNode))
 	})
 
@@ -58,7 +59,8 @@ func TestDeserializeNodes(t *testing.T) {
 		mockDB := NewMockDB()
 
 		serializedExtensionNode := extensionNode.Serialize()
-		deserializedExtensionNode := Deserialize(serializedExtensionNode, mockDB)
+		deserializedExtensionNode, err := Deserialize(serializedExtensionNode, mockDB)
+		require.Nil(t, err)
 		require.True(t, reflect.DeepEqual(deserializedExtensionNode, extensionNode))
 	})
 
@@ -72,7 +74,8 @@ func TestDeserializeNodes(t *testing.T) {
 		mockDB.Put(nextNode.Hash(), nextNode.Serialize())
 
 		serializedExtensionNode := extensionNode.Serialize()
-		deserializedExtensionNode := Deserialize(serializedExtensionNode, mockDB)
+		deserializedExtensionNode, err := Deserialize(serializedExtensionNode, mockDB)
+		require.Nil(t, err)
 		require.True(t, reflect.DeepEqual(deserializedExtensionNode, extensionNode))
 	})
 
@@ -101,7 +104,8 @@ func TestDeserializeNodes(t *testing.T) {
 		mockDB := NewMockDB()
 
 		serializedExt := ext1.Serialize()
-		deserializedExt := Deserialize(serializedExt, mockDB)
+		deserializedExt, err := Deserialize(serializedExt, mockDB)
+		require.Nil(t, err)
 		require.True(t, reflect.DeepEqual(deserializedExt, ext1))
 	})
 }
@@ -137,7 +141,7 @@ func TestExtensionNode(t *testing.T) {
 	b.SetBranch(0, leaf)
 	b.SetValue([]byte("verb")) // set the value for verb
 
-	ns, err := FromNibbleBytes([]byte{0, 1, 0, 2, 0, 3, 0, 4})
+	ns, err := CastBytesToNibbles([]byte{0, 1, 0, 2, 0, 3, 0, 4})
 	require.NoError(t, err)
 	e := NewExtensionNode(ns, b)
 	require.Equal(t, "e4850001020304ddc882350684636f696e8080808080808080808080808080808476657262", fmt.Sprintf("%x", e.Serialize()))
@@ -149,13 +153,13 @@ func TestLeafHash(t *testing.T) {
 	require.Equal(t, "76657262", fmt.Sprintf("%x", []byte("verb")))
 
 	// "buffer to nibbles
-	require.Equal(t, "0001000200030004", fmt.Sprintf("%x", NibblesFromBytes([]byte{1, 2, 3, 4})))
+	require.Equal(t, "0001000200030004", fmt.Sprintf("%x", NewNibblesFromBytes([]byte{1, 2, 3, 4})))
 
 	// ToPrefixed
-	require.Equal(t, "02000001000200030004", fmt.Sprintf("%x", AppendPrefixToNibbles(NibblesFromBytes([]byte{1, 2, 3, 4}), true)))
+	require.Equal(t, "02000001000200030004", fmt.Sprintf("%x", AppendPrefixToNibbles(NewNibblesFromBytes([]byte{1, 2, 3, 4}), true)))
 
 	// ToBuffer
-	require.Equal(t, "2001020304", fmt.Sprintf("%x", NibblesToBytes(AppendPrefixToNibbles(NibblesFromBytes([]byte{1, 2, 3, 4}), true))))
+	require.Equal(t, "2001020304", fmt.Sprintf("%x", ConvertNibblesToBytes(AppendPrefixToNibbles(NewNibblesFromBytes([]byte{1, 2, 3, 4}), true))))
 
 	require.Equal(t, "636f696e", fmt.Sprintf("%x", []byte("coin")))
 }
@@ -192,11 +196,11 @@ func TestLeafNode2(t *testing.T) {
 
 func printEachCalculationSteps(key, value []byte, isLeaf bool) map[string]string {
 	hexs := make(map[string]string)
-	hexs["key in nibbles"] = fmt.Sprintf("%x", NibblesFromBytes(key))
-	hexs["key in nibbles, and prefixed"] = fmt.Sprintf("%x", AppendPrefixToNibbles(NibblesFromBytes(key), isLeaf))
+	hexs["key in nibbles"] = fmt.Sprintf("%x", NewNibblesFromBytes(key))
+	hexs["key in nibbles, and prefixed"] = fmt.Sprintf("%x", AppendPrefixToNibbles(NewNibblesFromBytes(key), isLeaf))
 	hexs["key in nibbles, and prefixed, and convert back to buffer"] =
-		fmt.Sprintf("%x", NibblesToBytes(AppendPrefixToNibbles(NibblesFromBytes(key), isLeaf)))
-	beforeRLP := [][]byte{NibblesToBytes(AppendPrefixToNibbles(NibblesFromBytes(key), isLeaf)), value}
+		fmt.Sprintf("%x", ConvertNibblesToBytes(AppendPrefixToNibbles(NewNibblesFromBytes(key), isLeaf)))
+	beforeRLP := [][]byte{ConvertNibblesToBytes(AppendPrefixToNibbles(NewNibblesFromBytes(key), isLeaf)), value}
 	hexs["beforeRLP"] = fmt.Sprintf("%x", beforeRLP)
 	afterRLP, err := rlp.EncodeToBytes(beforeRLP)
 	if err != nil {

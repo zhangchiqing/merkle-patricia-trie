@@ -2,42 +2,42 @@ package mpt
 
 import "fmt"
 
-/// Trie is an in-memory representation of a Merkle Patricia Trie using RLP-encoding.
-/// Trie supports loading data from, and saving data to, persistent storage using the
-/// `LoadFromDB` and `SaveToDB` methods.
-///
-/// Trie exposes a state-machine-type API that simplifies implementation of Veritas'
-/// fraud proof functionality. This means that generally, its functions need to be
-/// called in careful orders (depending on what the calling code is trying to do).
-///
-/// # Usage
-///
-/// 1. Normal mode:
-///    Op 1. NewTrie(mode: MODE_NORMAL)
-///    Op 2. LoadFromDB()
-///    Op 3. *Get()/Put()
-///    Op 4. state_root = GetStateRoot()
-///    Op 5. if state_root == expected_state_root
-///            then SaveToDB()
-///            else go to 'Generate fraud proof mode'
-///
-/// 2. Generate fraud proof mode:
-///    Op 1. NewTrie(mode: MODE_GENERATE_FRAUD_PROOF)
-///    Op 2. LoadFromDB()
-///    Op 3. *Get()/Put()
-///    Op 4. pre_state, pseudo_post_state = GetPreAndPseudoPostState()
-///
-/// 3. Execute fraud proof mode:
-///    Op 1. NewTrie(mode: VERIFY_FRAUD_PROOF)
-///    Op 2. LoadPreState(pre_state)
-///    Op 3. *Get/Put()
-///    Op 4. if WasPreStateComplete() then continue else exit
-///    Op 5. LoadPseudoPostState(pseudo_post_state)
-///    Op 6. state_root = GetStateRoot()
-///    Op 7. if state_root == published_state_root
-///          then do nothing
-///          else disable the rollup
-///
+// Trie is an in-memory representation of a Merkle Patricia Trie using RLP-encoding.
+// Trie supports loading data from, and saving data to, persistent storage using the
+// `LoadFromDB` and `SaveToDB` methods.
+//
+// Trie exposes a state-machine-type API that simplifies implementation of Veritas'
+// fraud proof functionality. This means that generally, its functions need to be
+// called in careful orders (depending on what the calling code is trying to do).
+//
+// # Usage
+//
+// 1. Normal mode:
+//    Op 1. NewTrie(mode: MODE_NORMAL)
+//    Op 2. LoadFromDB()
+//    Op 3. *Get()/Put()
+//    Op 4. state_root = GetStateRoot()
+//    Op 5. if state_root == expected_state_root
+//            then SaveToDB()
+//            else go to 'Generate fraud proof mode'
+//
+// 2. Generate fraud proof mode:
+//    Op 1. NewTrie(mode: MODE_GENERATE_FRAUD_PROOF)
+//    Op 2. LoadFromDB()
+//    Op 3. *Get()/Put()
+//    Op 4. pre_state, pseudo_post_state = GetPreAndPseudoPostState()
+//
+// 3. Execute fraud proof mode:
+//    Op 1. NewTrie(mode: VERIFY_FRAUD_PROOF)
+//    Op 2. LoadPreState(pre_state)
+//    Op 3. *Get/Put()
+//    Op 4. if WasPreStateComplete() then continue else exit
+//    Op 5. LoadPseudoPostState(pseudo_post_state)
+//    Op 6. state_root = GetStateRoot()
+//    Op 7. if state_root == published_state_root
+//          then do nothing
+//          else disable the rollup
+//
 type Trie struct {
 	root Node
 	mode TrieMode
@@ -56,7 +56,7 @@ const (
 	MODE_DEAD                 TrieMode = 3
 )
 
-/// NewTrie returns an empty Trie in the specified, immutable mode.
+// NewTrie returns an empty Trie in the specified, immutable mode.
 func NewTrie(mode TrieMode) *Trie {
 	if mode != MODE_NORMAL && mode != MODE_GENERATE_FRAUD_PROOF && mode != MODE_VERIFY_FRAUD_PROOF {
 		panic("attempted to create a new trie with an invalid mode.")
@@ -68,7 +68,7 @@ func NewTrie(mode TrieMode) *Trie {
 	}
 }
 
-/// Get returns the value associated with key in the Trie, if it exists, and nil if does not.
+// Get returns the value associated with key in the Trie, if it exists, and nil if does not.
 func (t *Trie) Get(key []byte) []byte {
 	if t.mode == MODE_DEAD {
 		panic("attempted to use dead Trie. Read Trie documentation.")
@@ -91,19 +91,21 @@ func (t *Trie) Get(key []byte) []byte {
 	}
 }
 
+// PreState is a slice of (Key, Value) pairs.
 type PreState = [][2][]byte
-type PseudoPostState = []PseudoNode
 
-/// GetPreAndPseudoPostState returns PreState: the list of key-value pairs that have to be loaded into
-/// a Trie (using `LoadPreState`) to serve reads into world state during fraud proof execution, and
-/// PseudoPostState: the list of PseudoNodes that have to be loaded into a Trie (using `LoadPostState`)
-/// to calculate its post state root after fraud proof execution.
-///
-/// After calling this method, the Trie becomes dead.
-///
-/// # Panics
-/// This method panics if called when t.mode != MODE_GENERATE_FRAUD_PROOF.
-func (t *Trie) GetPreAndPseudoPostState() (PreState, PseudoPostState) {
+type PostState = []ProofNode
+
+// GetPreAndPseudoPostState returns PreState: the list of key-value pairs that have to be loaded into
+// a Trie (using `LoadPreState`) to serve reads into world state during fraud proof execution, and
+// PseudoPostState: the list of PseudoNodes that have to be loaded into a Trie (using `LoadPostState`)
+// to calculate its post state root after fraud proof execution.
+//
+// After calling this method, the Trie becomes dead.
+//
+// # Panics
+// This method panics if called when t.mode != MODE_GENERATE_FRAUD_PROOF.
+func (t *Trie) GetPreAndPseudoPostState() (PreState, PostState) {
 	if t.mode != MODE_GENERATE_FRAUD_PROOF {
 		panic("attempted to GetPreAndPseudoPostState, but Trie is not in generate fraud proof mode.")
 	}
@@ -114,7 +116,7 @@ func (t *Trie) GetPreAndPseudoPostState() (PreState, PseudoPostState) {
 	}
 
 	// TODO [Alice]
-	post_state := make([]PseudoNode, 0)
+	post_state := make([]ProofNode, 0)
 
 	t.mode = MODE_DEAD
 
@@ -133,7 +135,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 	// need to use pointer, so that I can update root in place without
 	// keeping trace of the parent node
 	node := &t.root
-	nibbles := NibblesFromBytes(key)
+	nibbles := NewNibblesFromBytes(key)
 	for {
 		if IsEmptyNode(*node) {
 			leaf := NewLeafNodeFromNibbles(nibbles, value)
@@ -258,7 +260,11 @@ func (t *Trie) LoadFromDB(db DB) error {
 		return err
 	}
 
-	rootNode := Deserialize(serializedRoot, db)
+	rootNode, err := Deserialize(serializedRoot, db)
+	if err != nil {
+		return err
+	}
+
 	t.root = rootNode
 
 	return nil
@@ -285,7 +291,7 @@ func (t *Trie) LoadPreState(pre_state PreState) {
 ///
 /// # Panics
 /// This method panics if called when t.mode != MODE_VERIFY_FRAUD_PROOF
-func (t *Trie) LoadPseudoPostState(pseudo_post_state PseudoPostState) {
+func (t *Trie) LoadPseudoPostState(pseudo_post_state PostState) {
 	if t.mode != MODE_VERIFY_FRAUD_PROOF {
 		panic("")
 	}
@@ -367,7 +373,7 @@ func (t *Trie) WasPreStateComplete() bool {
 
 func (t *Trie) getFromTrie(key []byte) []byte {
 	node := t.root
-	nibbles := NibblesFromBytes(key)
+	nibbles := NewNibblesFromBytes(key)
 	for {
 		if IsEmptyNode(node) {
 			return nil
