@@ -137,7 +137,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 	node := &t.root
 	nibbles := NewNibblesFromBytes(key)
 	for {
-		if IsEmptyNode(*node) {
+		if *node == nil {
 			leaf := NewLeafNodeFromNibbles(nibbles, value)
 			*node = leaf
 			return
@@ -157,11 +157,11 @@ func (t *Trie) Put(key []byte, value []byte) {
 			// if matched some nibbles, check if matches either all remaining nibbles
 			// or all leaf nibbles
 			if matched == len(leaf.path) {
-				branch.SetValue(leaf.value)
+				branch.setValue(leaf.value)
 			}
 
 			if matched == len(nibbles) {
-				branch.SetValue(value)
+				branch.setValue(value)
 			}
 
 			// if there is matched nibbles, an extension node will be created
@@ -177,13 +177,13 @@ func (t *Trie) Put(key []byte, value []byte) {
 			if matched < len(leaf.path) {
 				branchNibble, leafNibbles := leaf.path[matched], leaf.path[matched+1:]
 				newLeaf := NewLeafNodeFromNibbles(leafNibbles, leaf.value) // not :matched+1
-				branch.SetBranch(branchNibble, newLeaf)
+				branch.setBranch(branchNibble, newLeaf)
 			}
 
 			if matched < len(nibbles) {
 				branchNibble, leafNibbles := nibbles[matched], nibbles[matched+1:]
 				newLeaf := NewLeafNodeFromNibbles(leafNibbles, value)
-				branch.SetBranch(branchNibble, newLeaf)
+				branch.setBranch(branchNibble, newLeaf)
 			}
 
 			return
@@ -191,7 +191,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 
 		if branch, ok := (*node).(*BranchNode); ok {
 			if len(nibbles) == 0 {
-				branch.SetValue(value)
+				branch.setValue(value)
 				return
 			}
 
@@ -216,16 +216,16 @@ func (t *Trie) Put(key []byte, value []byte) {
 				if len(extRemainingnibbles) == 0 {
 					// E 0102030
 					// + 010203 good
-					branch.SetBranch(branchNibble, ext.next)
+					branch.setBranch(branchNibble, ext.next)
 				} else {
 					// E 01020304
 					// + 010203 good
 					newExt := NewExtensionNode(extRemainingnibbles, ext.next)
-					branch.SetBranch(branchNibble, newExt)
+					branch.setBranch(branchNibble, newExt)
 				}
 
 				remainingLeaf := NewLeafNodeFromNibbles(nodeLeafNibbles, value)
-				branch.SetBranch(nodeBranchNibble, remainingLeaf)
+				branch.setBranch(nodeBranchNibble, remainingLeaf)
 
 				// if there is no shared extension nibbles any more, then we don't need the extension node
 				// any more
@@ -260,7 +260,7 @@ func (t *Trie) LoadFromDB(db DB) error {
 		return err
 	}
 
-	rootNode, err := Deserialize(serializedRoot, db)
+	rootNode, err := NodeFromSerialBytes(serializedRoot, db)
 	if err != nil {
 		return err
 	}
@@ -308,52 +308,53 @@ func (t *Trie) SaveToDB(db DB) {
 		currentNode = nodes[0]
 		nodes = nodes[1:]
 
-		if IsEmptyNode(currentNode) {
+		if currentNode == nil {
 			continue
 		}
 
 		if leaf, ok := currentNode.(*LeafNode); ok {
-			leafHash := leaf.Hash()
-			db.Put(leafHash, leaf.Serialize())
+			leafHash := leaf.asHash()
+			db.Put(leafHash, leaf.asSerialBytes())
 			continue
 		}
 
 		if branch, ok := currentNode.(*BranchNode); ok {
-			branchHash := branch.Hash()
-			db.Put(branchHash, branch.Serialize())
+			branchHash := branch.asHash()
+			db.Put(branchHash, branch.asSerialBytes())
 
 			for i := 0; i < 16; i++ {
-				if !IsEmptyNode(branch.branches[i]) {
+				if branch.branches[i] != nil {
 					nodes = append(nodes, branch.branches[i])
 				}
 			}
 		}
 
 		if ext, ok := currentNode.(*ExtensionNode); ok {
-			extHash := ext.Hash()
-			db.Put(extHash, ext.Serialize())
+			extHash := ext.asHash()
+			db.Put(extHash, ext.asSerialBytes())
 
 			nodes = append(nodes, ext.next)
 			continue
 		}
 	}
 
-	rootHash := t.root.Hash()
+	rootHash := t.root.asHash()
 
 	// TOD0 [Alice]: Ask Ahsan why these two lines (it /was/ two lines when
 	// WriteBatch was still a thing) were originally swapped.
 	//
 	// TODO [Alice]: Ask Ahsan why we delete rootHash.
 	db.Delete(rootHash)
-	db.Put([]byte("root"), Serialize(t.root))
+	db.Put([]byte("root"), serializeNode(t.root))
 }
 
 /// Hash returns the root hash of the Trie.
 func (t *Trie) Hash() []byte {
-	if IsEmptyNode(t.root) {
-		return EmptyNodeHash
+	if t.root == nil {
+		return nilNodeHash
 	}
-	return t.root.Hash()
+
+	return t.root.asHash()
 }
 
 /// WasPreStateComplete returns whether PreState was complete during fraud proof transaction execution.
@@ -375,7 +376,7 @@ func (t *Trie) getFromTrie(key []byte) []byte {
 	node := t.root
 	nibbles := NewNibblesFromBytes(key)
 	for {
-		if IsEmptyNode(node) {
+		if node == nil {
 			return nil
 		}
 

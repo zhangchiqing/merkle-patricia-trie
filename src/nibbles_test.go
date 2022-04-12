@@ -142,7 +142,7 @@ func TestFromBytes(t *testing.T) {
 
 func TestToBytes(t *testing.T) {
 	bytes := []byte{0, 1, 2, 3}
-	require.Equal(t, bytes, ConvertNibblesToBytes(NewNibblesFromBytes(bytes)))
+	require.Equal(t, bytes, NibblesAsBytes(NewNibblesFromBytes(bytes)))
 }
 
 func TestPrefixMatchedLen(t *testing.T) {

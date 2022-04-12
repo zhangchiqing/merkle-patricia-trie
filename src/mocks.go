@@ -22,7 +22,7 @@ func (db *MockDB) Put(key []byte, value []byte) error {
 func (db *MockDB) Get(key []byte) (value []byte, err error) {
 	value, isPresent := db.keyValueStore[fmt.Sprintf("%x", key)]
 	if !isPresent {
-		return nil, fmt.Errorf("key not found")
+		return nil, nil
 	} else {
 		return value, nil
 	}

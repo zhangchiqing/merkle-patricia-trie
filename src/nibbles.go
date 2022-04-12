@@ -27,24 +27,24 @@ func NewNibblesFromBytes(bs []byte) []Nibble {
 	return ns
 }
 
-// CastByteToNibble casts nibble (a byte) into a value of type Nibble (which is just an alias of type byte)
-// /without/ changing the underlying value. This is in contrast to `ConvertByteToNibbles`, which actually
+// ByteAsNibble casts nibble (a byte) into a value of type Nibble (which is just an alias of type byte)
+// /without/ changing the underlying value. This is in contrast to `NewNibblesFromByte`, which actually
 // returns a different underlying value.
 //
-// CastByteToNibble returns an error if n is not a valid Nibble (i.e., it's not a value of type byte that
+// ByteAsNibble returns an error if n is not a valid Nibble (i.e., it's not a value of type byte that
 // is greater or equal to 0 and less than 16).
-func CastByteToNibble(nibble byte) (Nibble, error) {
+func ByteAsNibble(nibble byte) (Nibble, error) {
 	if !IsNibble(nibble) {
 		return 0, fmt.Errorf("non-nibble byte: %v", nibble)
 	}
 	return Nibble(nibble), nil
 }
 
-// CastBytesToNibbles generalizes CastByteToNibble for slice-of-bytes inputs.
-func CastBytesToNibbles(nibbles []byte) ([]Nibble, error) {
+// BytesAsNibbles generalizes ByteAsNibble for slice-of-bytes inputs.
+func BytesAsNibbles(nibbles []byte) ([]Nibble, error) {
 	ns := make([]Nibble, 0, len(nibbles))
 	for _, n := range nibbles {
-		nibble, err := CastByteToNibble(n)
+		nibble, err := ByteAsNibble(n)
 		if err != nil {
 			return nil, fmt.Errorf("contains non-nibble byte: %w", err)
 		}
@@ -53,9 +53,9 @@ func CastBytesToNibbles(nibbles []byte) ([]Nibble, error) {
 	return ns, nil
 }
 
-// ConvertNibblesToBytes converts a slice of nibbles to a byte slice assuming the nibble slice has even
+// NibblesAsBytes converts a slice of nibbles to a byte slice assuming the nibble slice has even
 // number of nibbles.
-func ConvertNibblesToBytes(ns []Nibble) []byte {
+func NibblesAsBytes(ns []Nibble) []byte {
 	buf := make([]byte, 0, len(ns)/2)
 
 	for i := 0; i < len(ns); i += 2 {

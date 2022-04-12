@@ -30,8 +30,8 @@ func TestMyTrie(t *testing.T) {
 	require.True(t, ok)
 	n1, ok := n0.next.(*BranchNode)
 	require.True(t, ok)
-	fmt.Printf("n0 hash: %x, Serialized: %x\n", n0.Hash(), n0.Serialize())
-	fmt.Printf("n1 hash: %x, Serialized: %x\n", n1.Hash(), n1.Serialize())
+	fmt.Printf("n0 hash: %x, Serialized: %x\n", n0.asHash(), n0.asSerialBytes())
+	fmt.Printf("n1 hash: %x, Serialized: %x\n", n1.asHash(), n1.asSerialBytes())
 }
 
 func TestProveAndVerifyProof(t *testing.T) {

@@ -65,11 +65,11 @@ func (t *Trie) Prove(key []byte) (Proof, bool) {
 	nibbles := NewNibblesFromBytes(key)
 
 	for {
-		proof.Put(Hash(node), Serialize(node))
-
-		if IsEmptyNode(node) {
+		if node == nil {
 			return nil, false
 		}
+
+		proof.Put(node.asHash(), serializeNode(node))
 
 		if leaf, ok := node.(*LeafNode); ok {
 			matched := PrefixMatchedLen(leaf.path, nibbles)
@@ -82,7 +82,7 @@ func (t *Trie) Prove(key []byte) (Proof, bool) {
 
 		if branch, ok := node.(*BranchNode); ok {
 			if len(nibbles) == 0 {
-				return proof, branch.HasValue()
+				return proof, branch.hasValue()
 			}
 
 			b, remaining := nibbles[0], nibbles[1:]
