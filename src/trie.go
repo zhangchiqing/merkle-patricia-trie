@@ -135,7 +135,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 	// need to use pointer, so that I can update root in place without
 	// keeping trace of the parent node
 	node := &t.root
-	nibbles := NewNibblesFromBytes(key)
+	nibbles := newNibblesFromBytes(key)
 	for {
 		if *node == nil {
 			leaf := NewLeafNodeFromNibbles(nibbles, value)
@@ -144,7 +144,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 		}
 
 		if leaf, ok := (*node).(*LeafNode); ok {
-			matched := PrefixMatchedLen(leaf.path, nibbles)
+			matched := commonPrefixLength(leaf.path, nibbles)
 
 			// if all matched, update value even if the value are equal
 			if matched == len(nibbles) && matched == len(leaf.path) {
@@ -206,7 +206,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 		// L 506 world
 		// + 010203 good
 		if ext, ok := (*node).(*ExtensionNode); ok {
-			matched := PrefixMatchedLen(ext.path, nibbles)
+			matched := commonPrefixLength(ext.path, nibbles)
 			if matched < len(ext.path) {
 				// E 01020304
 				// + 010203 good
@@ -340,10 +340,6 @@ func (t *Trie) SaveToDB(db DB) {
 
 	rootHash := t.root.ComputeHash()
 
-	// TOD0 [Alice]: Ask Ahsan why these two lines (it /was/ two lines when
-	// WriteBatch was still a thing) were originally swapped.
-	//
-	// TODO [Alice]: Ask Ahsan why we delete rootHash.
 	db.Delete(rootHash)
 	db.Put([]byte("root"), serializeNode(t.root))
 }
@@ -374,14 +370,14 @@ func (t *Trie) WasPreStateComplete() bool {
 
 func (t *Trie) getFromTrie(key []byte) []byte {
 	node := t.root
-	nibbles := NewNibblesFromBytes(key)
+	nibbles := newNibblesFromBytes(key)
 	for {
 		if node == nil {
 			return nil
 		}
 
 		if leaf, ok := node.(*LeafNode); ok {
-			matched := PrefixMatchedLen(leaf.path, nibbles)
+			matched := commonPrefixLength(leaf.path, nibbles)
 			if matched != len(leaf.path) || matched != len(nibbles) {
 				return nil
 			}
@@ -400,7 +396,7 @@ func (t *Trie) getFromTrie(key []byte) []byte {
 		}
 
 		if ext, ok := node.(*ExtensionNode); ok {
-			matched := PrefixMatchedLen(ext.path, nibbles)
+			matched := commonPrefixLength(ext.path, nibbles)
 			// E 01020304
 			//   010203
 			if matched < len(ext.path) {

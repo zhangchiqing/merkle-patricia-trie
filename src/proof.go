@@ -62,7 +62,7 @@ func (w *ProofDB) Get(key []byte) ([]byte, error) {
 func (t *Trie) Prove(key []byte) (Proof, bool) {
 	proof := NewProofDB()
 	node := t.root
-	nibbles := NewNibblesFromBytes(key)
+	nibbles := newNibblesFromBytes(key)
 
 	for {
 		if node == nil {
@@ -72,7 +72,7 @@ func (t *Trie) Prove(key []byte) (Proof, bool) {
 		proof.Put(node.ComputeHash(), serializeNode(node))
 
 		if leaf, ok := node.(*LeafNode); ok {
-			matched := PrefixMatchedLen(leaf.path, nibbles)
+			matched := commonPrefixLength(leaf.path, nibbles)
 			if matched != len(leaf.path) || matched != len(nibbles) {
 				return nil, false
 			}
@@ -92,7 +92,7 @@ func (t *Trie) Prove(key []byte) (Proof, bool) {
 		}
 
 		if ext, ok := node.(*ExtensionNode); ok {
-			matched := PrefixMatchedLen(ext.path, nibbles)
+			matched := commonPrefixLength(ext.path, nibbles)
 			// E 01020304
 			//   010203
 			if matched < len(ext.path) {

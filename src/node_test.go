@@ -113,7 +113,7 @@ func TestExtensionNode(t *testing.T) {
 	b.setBranch(0, leaf)
 	b.setValue([]byte("verb")) // set the value for verb
 
-	ns, err := BytesAsNibbles([]byte{0, 1, 0, 2, 0, 3, 0, 4})
+	ns, err := bytesAsNibbles([]byte{0, 1, 0, 2, 0, 3, 0, 4})
 	require.NoError(t, err)
 	e := NewExtensionNode(ns, b)
 	require.Equal(t, "e4850001020304ddc882350684636f696e8080808080808080808080808080808476657262", fmt.Sprintf("%x", e.asSerialBytes()))
@@ -125,13 +125,13 @@ func TestLeafHash(t *testing.T) {
 	require.Equal(t, "76657262", fmt.Sprintf("%x", []byte("verb")))
 
 	// "buffer to nibbles
-	require.Equal(t, "0001000200030004", fmt.Sprintf("%x", NewNibblesFromBytes([]byte{1, 2, 3, 4})))
+	require.Equal(t, "0001000200030004", fmt.Sprintf("%x", newNibblesFromBytes([]byte{1, 2, 3, 4})))
 
 	// ToPrefixed
-	require.Equal(t, "02000001000200030004", fmt.Sprintf("%x", AppendPrefixToNibbles(NewNibblesFromBytes([]byte{1, 2, 3, 4}), true)))
+	require.Equal(t, "02000001000200030004", fmt.Sprintf("%x", appendPrefixToNibbles(newNibblesFromBytes([]byte{1, 2, 3, 4}), true)))
 
 	// ToBuffer
-	require.Equal(t, "2001020304", fmt.Sprintf("%x", NibblesAsBytes(AppendPrefixToNibbles(NewNibblesFromBytes([]byte{1, 2, 3, 4}), true))))
+	require.Equal(t, "2001020304", fmt.Sprintf("%x", nibblesAsBytes(appendPrefixToNibbles(newNibblesFromBytes([]byte{1, 2, 3, 4}), true))))
 
 	require.Equal(t, "636f696e", fmt.Sprintf("%x", []byte("coin")))
 }
@@ -168,11 +168,11 @@ func TestLeafNode2(t *testing.T) {
 
 func printEachCalculationSteps(key, value []byte, isLeaf bool) map[string]string {
 	hexs := make(map[string]string)
-	hexs["key in nibbles"] = fmt.Sprintf("%x", NewNibblesFromBytes(key))
-	hexs["key in nibbles, and prefixed"] = fmt.Sprintf("%x", AppendPrefixToNibbles(NewNibblesFromBytes(key), isLeaf))
+	hexs["key in nibbles"] = fmt.Sprintf("%x", newNibblesFromBytes(key))
+	hexs["key in nibbles, and prefixed"] = fmt.Sprintf("%x", appendPrefixToNibbles(newNibblesFromBytes(key), isLeaf))
 	hexs["key in nibbles, and prefixed, and convert back to buffer"] =
-		fmt.Sprintf("%x", NibblesAsBytes(AppendPrefixToNibbles(NewNibblesFromBytes(key), isLeaf)))
-	beforeRLP := [][]byte{NibblesAsBytes(AppendPrefixToNibbles(NewNibblesFromBytes(key), isLeaf)), value}
+		fmt.Sprintf("%x", nibblesAsBytes(appendPrefixToNibbles(newNibblesFromBytes(key), isLeaf)))
+	beforeRLP := [][]byte{nibblesAsBytes(appendPrefixToNibbles(newNibblesFromBytes(key), isLeaf)), value}
 	hexs["beforeRLP"] = fmt.Sprintf("%x", beforeRLP)
 	afterRLP, err := rlp.EncodeToBytes(beforeRLP)
 	if err != nil {

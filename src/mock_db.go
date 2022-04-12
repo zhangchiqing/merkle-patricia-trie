@@ -4,10 +4,13 @@ import (
 	"fmt"
 )
 
+// MockDB is a simple implementation of the `DB` interfaces that is used for tests.
+// It does not write values in persistent storage.
 type MockDB struct {
 	keyValueStore map[string][]byte
 }
 
+// NewMockDB returns a pointer to an empty MockDB.
 func NewMockDB() *MockDB {
 	return &MockDB{
 		keyValueStore: make(map[string][]byte),

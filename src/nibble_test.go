@@ -8,8 +8,7 @@ import (
 
 func TestIsNibble(t *testing.T) {
 	for i := 0; i < 20; i++ {
-		isNibble := i >= 0 && i < 16
-		require.Equal(t, isNibble, IsNibble(byte(i)), i)
+		require.Equal(t, i >= 0 && i < 16, isNibble(byte(i)), i)
 	}
 }
 
@@ -69,7 +68,7 @@ func TestToPrefixed(t *testing.T) {
 	for _, c := range cases {
 		require.Equal(t,
 			c.expected,
-			AppendPrefixToNibbles(c.ns, c.isLeafNode))
+			appendPrefixToNibbles(c.ns, c.isLeafNode))
 	}
 }
 
@@ -127,7 +126,7 @@ func TestRemovePrefix(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		nibbles, isLeafNode := RemovePrefixFromNibbles(c.ns)
+		nibbles, isLeafNode := removePrefixFromNibbles(c.ns)
 		require.Equal(t,
 			c.expected,
 			nibbles)
@@ -137,16 +136,16 @@ func TestRemovePrefix(t *testing.T) {
 
 func TestFromBytes(t *testing.T) {
 	// [1, 100] -> ['0x01', '0x64']
-	require.Equal(t, []Nibble{0, 1, 6, 4}, NewNibblesFromBytes([]byte{1, 100}))
+	require.Equal(t, []Nibble{0, 1, 6, 4}, newNibblesFromBytes([]byte{1, 100}))
 }
 
 func TestToBytes(t *testing.T) {
 	bytes := []byte{0, 1, 2, 3}
-	require.Equal(t, bytes, NibblesAsBytes(NewNibblesFromBytes(bytes)))
+	require.Equal(t, bytes, nibblesAsBytes(newNibblesFromBytes(bytes)))
 }
 
 func TestPrefixMatchedLen(t *testing.T) {
-	require.Equal(t, 3, PrefixMatchedLen([]Nibble{0, 1, 2, 3}, []Nibble{0, 1, 2}))
-	require.Equal(t, 4, PrefixMatchedLen([]Nibble{0, 1, 2, 3}, []Nibble{0, 1, 2, 3}))
-	require.Equal(t, 4, PrefixMatchedLen([]Nibble{0, 1, 2, 3}, []Nibble{0, 1, 2, 3, 4}))
+	require.Equal(t, 3, commonPrefixLength([]Nibble{0, 1, 2, 3}, []Nibble{0, 1, 2}))
+	require.Equal(t, 4, commonPrefixLength([]Nibble{0, 1, 2, 3}, []Nibble{0, 1, 2, 3}))
+	require.Equal(t, 4, commonPrefixLength([]Nibble{0, 1, 2, 3}, []Nibble{0, 1, 2, 3, 4}))
 }

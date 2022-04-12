@@ -102,8 +102,8 @@ func nodeFromRaw(node Slots, db DB) (Node, error) {
 	} else {
 		// Either extension node or leaf node
 		nibbleBytes := node[0]
-		prefixedNibbles := NewNibblesFromBytes(nibbleBytes.([]byte))
-		nibbles, isLeafNode := RemovePrefixFromNibbles(prefixedNibbles)
+		prefixedNibbles := newNibblesFromBytes(nibbleBytes.([]byte))
+		nibbles, isLeafNode := removePrefixFromNibbles(prefixedNibbles)
 
 		if isLeafNode {
 			///////////////////
@@ -256,7 +256,7 @@ func (e ExtensionNode) ComputeHash() []byte {
 
 func (e ExtensionNode) asSlots() Slots {
 	slots := make(Slots, 2)
-	slots[0] = NibblesAsBytes(AppendPrefixToNibbles(e.path, false))
+	slots[0] = nibblesAsBytes(appendPrefixToNibbles(e.path, false))
 	if len(serializeNode(e.next)) >= 32 {
 		slots[1] = e.next.ComputeHash()
 	} else {
@@ -287,7 +287,7 @@ func NewLeafNodeFromNibbles(nibbles []Nibble, value []byte) *LeafNode {
 
 // TODO [Alice]: Marked for deletion.
 func NewLeafNodeFromNibbleBytes(nibbles []byte, value []byte) (*LeafNode, error) {
-	ns, err := BytesAsNibbles(nibbles)
+	ns, err := bytesAsNibbles(nibbles)
 	if err != nil {
 		return nil, fmt.Errorf("could not leaf node from nibbles: %w", err)
 	}
@@ -297,7 +297,7 @@ func NewLeafNodeFromNibbleBytes(nibbles []byte, value []byte) (*LeafNode, error)
 
 // TODO [Alice]: Marked for deletion.
 func NewLeafNodeFromBytes(key, value []byte) *LeafNode {
-	return NewLeafNodeFromNibbles(NewNibblesFromBytes(key), value)
+	return NewLeafNodeFromNibbles(newNibblesFromBytes(key), value)
 }
 
 func (l LeafNode) ComputeHash() []byte {
@@ -305,7 +305,7 @@ func (l LeafNode) ComputeHash() []byte {
 }
 
 func (l LeafNode) asSlots() Slots {
-	path := NibblesAsBytes(AppendPrefixToNibbles(l.path, true))
+	path := nibblesAsBytes(appendPrefixToNibbles(l.path, true))
 	raw := Slots{path, l.value}
 	return raw
 }

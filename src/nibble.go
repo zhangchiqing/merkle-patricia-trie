@@ -9,42 +9,42 @@ import (
 // hexadecimal number (4 bits) can take.
 type Nibble byte
 
-// NewNibblesFromByte converts a single byte (8 bits, 2^8 possible values) to a slice containing two nibbles:
+// newNibblesFromByte converts a single byte (8 bits, 2^8 possible values) to a slice containing two nibbles:
 // (2 * 4 bits, 2^4*2 = 2^8 possible values).
-func NewNibblesFromByte(b byte) []Nibble {
+func newNibblesFromByte(b byte) []Nibble {
 	return []Nibble{
 		Nibble(byte(b >> 4)),
 		Nibble(byte(b % 16)),
 	}
 }
 
-// NewNibblesFromBytes generalizes NewNibblesFromByte for slice-of-bytes inputs.
-func NewNibblesFromBytes(bs []byte) []Nibble {
+// newNibblesFromBytes generalizes NewNibblesFromByte for slice-of-bytes inputs.
+func newNibblesFromBytes(bs []byte) []Nibble {
 	ns := make([]Nibble, 0, len(bs)*2)
 	for _, b := range bs {
-		ns = append(ns, NewNibblesFromByte(b)...)
+		ns = append(ns, newNibblesFromByte(b)...)
 	}
 	return ns
 }
 
-// ByteAsNibble casts nibble (a byte) into a value of type Nibble (which is just an alias of type byte)
+// byteAsNibble casts nibble (a byte) into a value of type Nibble (which is just an alias of type byte)
 // /without/ changing the underlying value. This is in contrast to `NewNibblesFromByte`, which actually
 // returns a different underlying value.
 //
-// ByteAsNibble returns an error if n is not a valid Nibble (i.e., it's not a value of type byte that
+// byteAsNibble returns an error if n is not a valid Nibble (i.e., it's not a value of type byte that
 // is greater or equal to 0 and less than 16).
-func ByteAsNibble(nibble byte) (Nibble, error) {
-	if !IsNibble(nibble) {
+func byteAsNibble(nibble byte) (Nibble, error) {
+	if !isNibble(nibble) {
 		return 0, fmt.Errorf("non-nibble byte: %v", nibble)
 	}
 	return Nibble(nibble), nil
 }
 
-// BytesAsNibbles generalizes ByteAsNibble for slice-of-bytes inputs.
-func BytesAsNibbles(nibbles []byte) ([]Nibble, error) {
+// bytesAsNibbles generalizes ByteAsNibble for slice-of-bytes inputs.
+func bytesAsNibbles(nibbles []byte) ([]Nibble, error) {
 	ns := make([]Nibble, 0, len(nibbles))
 	for _, n := range nibbles {
-		nibble, err := ByteAsNibble(n)
+		nibble, err := byteAsNibble(n)
 		if err != nil {
 			return nil, fmt.Errorf("contains non-nibble byte: %w", err)
 		}
@@ -53,9 +53,9 @@ func BytesAsNibbles(nibbles []byte) ([]Nibble, error) {
 	return ns, nil
 }
 
-// NibblesAsBytes converts a slice of nibbles to a byte slice assuming the nibble slice has even
+// nibblesAsBytes converts a slice of nibbles to a byte slice assuming the nibble slice has even
 // number of nibbles.
-func NibblesAsBytes(ns []Nibble) []byte {
+func nibblesAsBytes(ns []Nibble) []byte {
 	buf := make([]byte, 0, len(ns)/2)
 
 	for i := 0; i < len(ns); i += 2 {
@@ -66,13 +66,12 @@ func NibblesAsBytes(ns []Nibble) []byte {
 	return buf
 }
 
-// AppendPrefixToNibbles add nibble prefix to a slice of nibbles to make its length even.
-// The prefix disambiguates whether a deserialization of a node corresponds to a LeafNode or an ExtensionNode.
-func AppendPrefixToNibbles(ns []Nibble, isLeafNode bool) []Nibble {
-	// create prefix
+// appendPrefixToNibbles add nibble prefix to a slice of nibbles to make its length even.
+// The prefix helps disambiguates whether a serialization of a node corresponds to a LeafNode or an ExtensionNode.
+func appendPrefixToNibbles(ns []Nibble, isLeafNode bool) []Nibble {
 	var prefixBytes []Nibble
-	// odd number of nibbles
 	if len(ns)%2 > 0 {
+		// odd number of nibbles
 		prefixBytes = []Nibble{1}
 	} else {
 		// even number of nibbles
@@ -94,10 +93,9 @@ func AppendPrefixToNibbles(ns []Nibble, isLeafNode bool) []Nibble {
 	return prefixed
 }
 
-// RemovePrefixFromNibbles removes nibble prefix from a slice of nibbles and
-// tells if the nibbles belong to a leaf node
-func RemovePrefixFromNibbles(ns []Nibble) (noPrefixNs []Nibble, isLeafNode bool) {
-
+// removePrefixFromNibbles removes nibble prefix from a slice of nibbles and
+// returns whether the nibbles belong to a leaf node
+func removePrefixFromNibbles(ns []Nibble) (noPrefixNs []Nibble, isLeafNode bool) {
 	// From https://eth.wiki/fundamentals/patricia-tree:
 	//
 	// 	hex char    bits    |    node type partial     path length
@@ -126,13 +124,15 @@ func RemovePrefixFromNibbles(ns []Nibble) (noPrefixNs []Nibble, isLeafNode bool)
 	panic("invalid nibble prefix")
 }
 
-// [0,1,2,3], [0,1,2] => 3
-// [0,1,2,3], [0,1,2,3] => 4
-// [0,1,2,3], [0,1,2,3,4] => 4
-func PrefixMatchedLen(node1 []Nibble, node2 []Nibble) int {
+// commonPrefixLength returns the number of nibbles common in the prefixes of ns1 and ns2.
+// Example outputs:
+// * [0,1,2,3], [0,1,2] => 3
+// * [0,1,2,3], [0,1,2,3] => 4
+// * [0,1,2,3], [0,1,2,3,4] => 4
+func commonPrefixLength(ns1 []Nibble, ns2 []Nibble) int {
 	matched := 0
-	for i := 0; i < len(node1) && i < len(node2); i++ {
-		n1, n2 := node1[i], node2[i]
+	for i := 0; i < len(ns1) && i < len(ns2); i++ {
+		n1, n2 := ns1[i], ns2[i]
 		if n1 == n2 {
 			matched++
 		} else {
@@ -143,8 +143,9 @@ func PrefixMatchedLen(node1 []Nibble, node2 []Nibble) int {
 	return matched
 }
 
-func IsNibble(nibble byte) bool {
-	n := int(nibble)
-	// 0-9 && a-f
+// isNibble returns whether b is a value within the range [0, 16) and therefore can be used to create a Nibble.
+func isNibble(b byte) bool {
+	n := int(b)
+	// 0-9 | a-f
 	return n >= 0 && n < 16
 }
