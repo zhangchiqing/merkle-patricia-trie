@@ -3,9 +3,9 @@
 ## Intro
 This is a simplified implementation of Ethereum's modified Merkle Patricia Trie based on the [Ethereum's yellow paper](https://ethereum.github.io/yellowpaper/paper.pdf). It's written in golang.
 
-This implementation was originally written by [Leo Zhang](https://github.com/zhangchiqing) without a persistence feature for learning purposes only. However, Veritas engineers are actively working on creating an encoding/decoding mechanism, and an added layer of on-disk persistence with LevelDB.
+The basis of this implementation came from [Leo Zhang](https://github.com/zhangchiqing). Veritas engineers heavily refactored this library, and also expanded its functionality to include features that support our L2 rollup. 
 
-This repo also includes a tutorial of how Merkle Patrica Trie works.
+A tutorial of how Merkle Patricia Tries work is included in the later sections of this document.
 
 ## A basic key-value mapping
 Ethereum's Merkle Patricia Trie is essentially a key-value mapping that provides the following standard methods:
