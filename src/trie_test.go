@@ -102,7 +102,7 @@ func TestPut(t *testing.T) {
 	key := []byte{1, 2, 3, 4}
 	trie.Put(key, []byte("hello"))
 
-	nibbles := newNibblesFromBytes(key)
+	nibbles := newNibbles(key)
 	leaf := newLeafNode(nibbles, []byte("hello"))
 
 	require.Equal(t, leaf.hash(), trie.RootHash())
@@ -131,7 +131,7 @@ func TestPutLeafAllMatched(t *testing.T) {
 	trie.Put(key, []byte("hello"))
 	trie.Put(key, []byte("world"))
 
-	nibbles := newNibblesFromBytes(key)
+	nibbles := newNibbles(key)
 	leaf := newLeafNode(nibbles, []byte("world"))
 
 	require.Equal(t, leaf.hash(), trie.RootHash())

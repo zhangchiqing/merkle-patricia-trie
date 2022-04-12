@@ -62,7 +62,7 @@ func (w *ProofDB) Get(key []byte) ([]byte, error) {
 func (t *Trie) Prove(key []byte) (Proof, bool) {
 	proof := NewProofDB()
 	node := t.root
-	nibbles := newNibblesFromBytes(key)
+	nibbles := newNibbles(key)
 
 	for {
 		if node == nil {

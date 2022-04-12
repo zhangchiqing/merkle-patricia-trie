@@ -136,12 +136,12 @@ func TestRemovePrefix(t *testing.T) {
 
 func TestFromBytes(t *testing.T) {
 	// [1, 100] -> ['0x01', '0x64']
-	require.Equal(t, []Nibble{0, 1, 6, 4}, newNibblesFromBytes([]byte{1, 100}))
+	require.Equal(t, []Nibble{0, 1, 6, 4}, newNibbles([]byte{1, 100}))
 }
 
 func TestToBytes(t *testing.T) {
 	bytes := []byte{0, 1, 2, 3}
-	require.Equal(t, bytes, nibblesAsBytes(newNibblesFromBytes(bytes)))
+	require.Equal(t, bytes, nibblesAsBytes(newNibbles(bytes)))
 }
 
 func TestPrefixMatchedLen(t *testing.T) {

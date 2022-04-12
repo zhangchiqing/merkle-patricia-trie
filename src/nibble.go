@@ -11,18 +11,10 @@ type Nibble byte
 
 // newNibblesFromByte converts a single byte (8 bits, 2^8 possible values) to a slice containing two nibbles:
 // (2 * 4 bits, 2^4*2 = 2^8 possible values).
-func newNibblesFromByte(b byte) []Nibble {
-	return []Nibble{
-		Nibble(byte(b >> 4)),
-		Nibble(byte(b % 16)),
-	}
-}
-
-// newNibblesFromBytes generalizes NewNibblesFromByte for slice-of-bytes inputs.
-func newNibblesFromBytes(bs []byte) []Nibble {
+func newNibbles(bs []byte) []Nibble {
 	ns := make([]Nibble, 0, len(bs)*2)
 	for _, b := range bs {
-		ns = append(ns, newNibblesFromByte(b)...)
+		ns = append(ns, Nibble(b>>4), Nibble(b%16))
 	}
 	return ns
 }
@@ -33,21 +25,13 @@ func newNibblesFromBytes(bs []byte) []Nibble {
 //
 // byteAsNibble returns an error if n is not a valid Nibble (i.e., it's not a value of type byte that
 // is greater or equal to 0 and less than 16).
-func byteAsNibble(nibble byte) (Nibble, error) {
-	if !isNibble(nibble) {
-		return 0, fmt.Errorf("non-nibble byte: %v", nibble)
-	}
-	return Nibble(nibble), nil
-}
-
-// bytesAsNibbles generalizes ByteAsNibble for slice-of-bytes inputs.
-func bytesAsNibbles(nibbles []byte) ([]Nibble, error) {
+func bytesAsNibbles(nibbles ...byte) ([]Nibble, error) {
 	ns := make([]Nibble, 0, len(nibbles))
-	for _, n := range nibbles {
-		nibble, err := byteAsNibble(n)
-		if err != nil {
-			return nil, fmt.Errorf("contains non-nibble byte: %w", err)
+	for _, b := range nibbles {
+		if !isNibble(b) {
+			return nil, fmt.Errorf("contains non-nibble byte: %v", b)
 		}
+		nibble := Nibble(b)
 		ns = append(ns, nibble)
 	}
 	return ns, nil

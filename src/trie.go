@@ -103,7 +103,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 	// need to use pointer, so that I can update root in place without
 	// keeping trace of the parent node
 	node := &t.root
-	nibbles := newNibblesFromBytes(key)
+	nibbles := newNibbles(key)
 	for {
 		if *node == nil {
 			leaf := newLeafNode(nibbles, value)
@@ -371,7 +371,7 @@ func (t *Trie) WasPreStateComplete() bool {
 
 func (t *Trie) getFromTrie(key []byte) []byte {
 	node := t.root
-	nibbles := newNibblesFromBytes(key)
+	nibbles := newNibbles(key)
 	for {
 		if node == nil {
 			return nil

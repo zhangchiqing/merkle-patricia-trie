@@ -243,7 +243,7 @@ func nodeFromRaw(node Slots, db DB) (Node, error) {
 	} else {
 		// Either extension node or leaf node
 		nibbleBytes := node[0]
-		prefixedNibbles := newNibblesFromBytes(nibbleBytes.([]byte))
+		prefixedNibbles := newNibbles(nibbleBytes.([]byte))
 		nibbles, isLeafNode := removePrefixFromNibbles(prefixedNibbles)
 
 		if isLeafNode {
