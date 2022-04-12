@@ -30,8 +30,8 @@ func TestMyTrie(t *testing.T) {
 	require.True(t, ok)
 	n1, ok := n0.next.(*BranchNode)
 	require.True(t, ok)
-	fmt.Printf("n0 hash: %x, Serialized: %x\n", n0.ComputeHash(), n0.asSerialBytes())
-	fmt.Printf("n1 hash: %x, Serialized: %x\n", n1.ComputeHash(), n1.asSerialBytes())
+	fmt.Printf("n0 hash: %x, serialized: %x\n", n0.hash(), n0.serialized())
+	fmt.Printf("n1 hash: %x, serialized: %x\n", n1.hash(), n1.serialized())
 }
 
 func TestProveAndVerifyProof(t *testing.T) {
@@ -53,7 +53,7 @@ func TestProveAndVerifyProof(t *testing.T) {
 		proof, ok := tr.Prove(key)
 		require.True(t, ok)
 
-		rootHash := tr.Hash()
+		rootHash := tr.RootHash()
 
 		// verify the proof with the root hash, the key in question and its proof
 		val, err := VerifyProof(rootHash, key, proof)
@@ -69,7 +69,7 @@ func TestProveAndVerifyProof(t *testing.T) {
 		tr.Put([]byte{1, 2, 3, 4, 5}, []byte("world"))
 
 		// the hash was taken before the trie was updated
-		rootHash := tr.Hash()
+		rootHash := tr.RootHash()
 
 		// the proof was generated after the trie was updated
 		tr.Put([]byte{5, 6, 7}, []byte("trie"))

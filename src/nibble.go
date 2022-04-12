@@ -125,7 +125,7 @@ func removePrefixFromNibbles(ns []Nibble) (noPrefixNs []Nibble, isLeafNode bool)
 }
 
 // commonPrefixLength returns the number of nibbles common in the prefixes of ns1 and ns2.
-// Example outputs:
+// Example outputs of commonPrefixLength:
 // * [0,1,2,3], [0,1,2] => 3
 // * [0,1,2,3], [0,1,2,3] => 4
 // * [0,1,2,3], [0,1,2,3,4] => 4

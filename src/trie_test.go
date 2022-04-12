@@ -41,16 +41,16 @@ func TestGetPut(t *testing.T) {
 func TestDataIntegrity(t *testing.T) {
 	t.Run("should get a different hash if a new key-value pair was added or updated", func(t *testing.T) {
 		trie := NewTrie(MODE_NORMAL)
-		hash0 := trie.Hash()
+		hash0 := trie.RootHash()
 
 		trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
-		hash1 := trie.Hash()
+		hash1 := trie.RootHash()
 
 		trie.Put([]byte{1, 2}, []byte("world"))
-		hash2 := trie.Hash()
+		hash2 := trie.RootHash()
 
 		trie.Put([]byte{1, 2}, []byte("trie"))
-		hash3 := trie.Hash()
+		hash3 := trie.RootHash()
 
 		require.NotEqual(t, hash0, hash1)
 		require.NotEqual(t, hash1, hash2)
@@ -66,7 +66,7 @@ func TestDataIntegrity(t *testing.T) {
 		trie2.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 		trie2.Put([]byte{1, 2}, []byte("world"))
 
-		require.Equal(t, trie1.Hash(), trie2.Hash())
+		require.Equal(t, trie1.RootHash(), trie2.RootHash())
 	})
 }
 
@@ -89,18 +89,23 @@ func TestPut2Pairs(t *testing.T) {
 	leaf, ok := branch.branches[0].(*LeafNode)
 	require.True(t, ok)
 
-	hexEqual(t, "c37ec985b7a88c2c62beb268750efe657c36a585beb435eb9f43b839846682ce", leaf.ComputeHash())
-	hexEqual(t, "ddc882350684636f696e8080808080808080808080808080808476657262", branch.asSerialBytes())
-	hexEqual(t, "d757709f08f7a81da64a969200e59ff7e6cd6b06674c3f668ce151e84298aa79", branch.ComputeHash())
-	hexEqual(t, "64d67c5318a714d08de6958c0e63a05522642f3f1087c6fd68a97837f203d359", ext.ComputeHash())
+	hexEqual(t, "c37ec985b7a88c2c62beb268750efe657c36a585beb435eb9f43b839846682ce", leaf.hash())
+	hexEqual(t, "ddc882350684636f696e8080808080808080808080808080808476657262", branch.serialized())
+	hexEqual(t, "d757709f08f7a81da64a969200e59ff7e6cd6b06674c3f668ce151e84298aa79", branch.hash())
+	hexEqual(t, "64d67c5318a714d08de6958c0e63a05522642f3f1087c6fd68a97837f203d359", ext.hash())
 }
 
 func TestPut(t *testing.T) {
 	trie := NewTrie(MODE_NORMAL)
-	require.Equal(t, nilNodeHash, trie.Hash())
-	trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
-	ns := NewLeafNodeFromBytes([]byte{1, 2, 3, 4}, []byte("hello"))
-	require.Equal(t, ns.ComputeHash(), trie.Hash())
+	require.Equal(t, nilNodeHash, trie.RootHash())
+
+	key := []byte{1, 2, 3, 4}
+	trie.Put(key, []byte("hello"))
+
+	nibbles := newNibblesFromBytes(key)
+	leaf := newLeafNode(nibbles, []byte("hello"))
+
+	require.Equal(t, leaf.hash(), trie.RootHash())
 }
 
 func TestPutLeafShorter(t *testing.T) {
@@ -108,24 +113,28 @@ func TestPutLeafShorter(t *testing.T) {
 	trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 	trie.Put([]byte{1, 2, 3}, []byte("world"))
 
-	leaf := NewLeafNodeFromNibbles([]Nibble{4}, []byte("hello"))
+	leaf := newLeafNode([]Nibble{4}, []byte("hello"))
 
-	branch := NewBranchNode()
+	branch := newBranchNode()
 	branch.setBranch(Nibble(0), leaf)
 	branch.setValue([]byte("world"))
 
-	ext := NewExtensionNode([]Nibble{0, 1, 0, 2, 0, 3}, branch)
+	ext := newExtensionNode([]Nibble{0, 1, 0, 2, 0, 3}, branch)
 
-	require.Equal(t, ext.ComputeHash(), trie.Hash())
+	require.Equal(t, ext.hash(), trie.RootHash())
 }
 
 func TestPutLeafAllMatched(t *testing.T) {
 	trie := NewTrie(MODE_NORMAL)
-	trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
-	trie.Put([]byte{1, 2, 3, 4}, []byte("world"))
 
-	ns := NewLeafNodeFromBytes([]byte{1, 2, 3, 4}, []byte("world"))
-	require.Equal(t, ns.ComputeHash(), trie.Hash())
+	key := []byte{1, 2, 3, 4}
+	trie.Put(key, []byte("hello"))
+	trie.Put(key, []byte("world"))
+
+	nibbles := newNibblesFromBytes(key)
+	leaf := newLeafNode(nibbles, []byte("world"))
+
+	require.Equal(t, leaf.hash(), trie.RootHash())
 }
 
 func TestPutLeafMore(t *testing.T) {
@@ -133,15 +142,15 @@ func TestPutLeafMore(t *testing.T) {
 	trie.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 	trie.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("world"))
 
-	leaf := NewLeafNodeFromNibbles([]Nibble{5, 0, 6}, []byte("world"))
+	leaf := newLeafNode([]Nibble{5, 0, 6}, []byte("world"))
 
-	branch := NewBranchNode()
+	branch := newBranchNode()
 	branch.setValue([]byte("hello"))
 	branch.setBranch(Nibble(0), leaf)
 
-	ext := NewExtensionNode([]Nibble{0, 1, 0, 2, 0, 3, 0, 4}, branch)
+	ext := newExtensionNode([]Nibble{0, 1, 0, 2, 0, 3, 0, 4}, branch)
 
-	require.Equal(t, ext.ComputeHash(), trie.Hash())
+	require.Equal(t, ext.hash(), trie.RootHash())
 }
 
 func TestPutOrder(t *testing.T) {
@@ -153,7 +162,7 @@ func TestPutOrder(t *testing.T) {
 	trie2.Put([]byte{1, 2, 3, 4}, []byte("hello"))
 	trie2.Put([]byte{1, 2, 3, 4, 5, 6}, []byte("world"))
 
-	require.Equal(t, trie1.Hash(), trie2.Hash())
+	require.Equal(t, trie1.RootHash(), trie2.RootHash())
 }
 
 func TestPersistInDB(t *testing.T) {
@@ -176,9 +185,9 @@ func TestPersistInDB(t *testing.T) {
 	require.True(t, ok)
 
 	expectedKeyValueStore := map[string][]byte{
-		fmt.Sprintf("%x", "root"):               ext.asSerialBytes(),
-		fmt.Sprintf("%x", branch.ComputeHash()): branch.asSerialBytes(),
-		fmt.Sprintf("%x", leaf.ComputeHash()):   leaf.asSerialBytes(),
+		fmt.Sprintf("%x", "root"):        ext.serialized(),
+		fmt.Sprintf("%x", branch.hash()): branch.serialized(),
+		fmt.Sprintf("%x", leaf.hash()):   leaf.serialized(),
 	}
 
 	require.True(t, reflect.DeepEqual(expectedKeyValueStore, mockDB.keyValueStore))
@@ -197,7 +206,7 @@ func TestGenerateFromDB(t *testing.T) {
 
 	newTrie := NewTrie(MODE_NORMAL)
 	newTrie.LoadFromDB(mockDB)
-	require.Equal(t, trie.root.ComputeHash(), newTrie.root.ComputeHash())
+	require.Equal(t, trie.root.hash(), newTrie.root.hash())
 
 	require.True(t, reflect.DeepEqual(trie, newTrie))
 }

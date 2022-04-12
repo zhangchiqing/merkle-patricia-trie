@@ -91,38 +91,6 @@ func (t *Trie) Get(key []byte) []byte {
 	}
 }
 
-// PreState is a slice of (Key, Value) pairs.
-type PreState = [][2][]byte
-
-type PostState = []ProofNode
-
-// GetPreAndPseudoPostState returns PreState: the list of key-value pairs that have to be loaded into
-// a Trie (using `LoadPreState`) to serve reads into world state during fraud proof execution, and
-// PseudoPostState: the list of PseudoNodes that have to be loaded into a Trie (using `LoadPostState`)
-// to calculate its post state root after fraud proof execution.
-//
-// After calling this method, the Trie becomes dead.
-//
-// # Panics
-// This method panics if called when t.mode != MODE_GENERATE_FRAUD_PROOF.
-func (t *Trie) GetPreAndPseudoPostState() (PreState, PostState) {
-	if t.mode != MODE_GENERATE_FRAUD_PROOF {
-		panic("attempted to GetPreAndPseudoPostState, but Trie is not in generate fraud proof mode.")
-	}
-
-	pre_state := make([][2][]byte, 0)
-	for key, value := range t.readSet {
-		pre_state = append(pre_state, [2][]byte{[]byte(key), value})
-	}
-
-	// TODO [Alice]
-	post_state := make([]ProofNode, 0)
-
-	t.mode = MODE_DEAD
-
-	return pre_state, post_state
-}
-
 /// Put adds a key value pair to the Trie.
 ///
 /// # Panics
@@ -138,7 +106,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 	nibbles := newNibblesFromBytes(key)
 	for {
 		if *node == nil {
-			leaf := NewLeafNodeFromNibbles(nibbles, value)
+			leaf := newLeafNode(nibbles, value)
 			*node = leaf
 			return
 		}
@@ -148,12 +116,12 @@ func (t *Trie) Put(key []byte, value []byte) {
 
 			// if all matched, update value even if the value are equal
 			if matched == len(nibbles) && matched == len(leaf.path) {
-				newLeaf := NewLeafNodeFromNibbles(leaf.path, value)
+				newLeaf := newLeafNode(leaf.path, value)
 				*node = newLeaf
 				return
 			}
 
-			branch := NewBranchNode()
+			branch := newBranchNode()
 			// if matched some nibbles, check if matches either all remaining nibbles
 			// or all leaf nibbles
 			if matched == len(leaf.path) {
@@ -167,7 +135,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 			// if there is matched nibbles, an extension node will be created
 			if matched > 0 {
 				// create an extension node for the shared nibbles
-				ext := NewExtensionNode(leaf.path[:matched], branch)
+				ext := newExtensionNode(leaf.path[:matched], branch)
 				*node = ext
 			} else {
 				// when there no matched nibble, there is no need to keep the extension node
@@ -176,13 +144,13 @@ func (t *Trie) Put(key []byte, value []byte) {
 
 			if matched < len(leaf.path) {
 				branchNibble, leafNibbles := leaf.path[matched], leaf.path[matched+1:]
-				newLeaf := NewLeafNodeFromNibbles(leafNibbles, leaf.value) // not :matched+1
+				newLeaf := newLeafNode(leafNibbles, leaf.value) // not :matched+1
 				branch.setBranch(branchNibble, newLeaf)
 			}
 
 			if matched < len(nibbles) {
 				branchNibble, leafNibbles := nibbles[matched], nibbles[matched+1:]
-				newLeaf := NewLeafNodeFromNibbles(leafNibbles, value)
+				newLeaf := newLeafNode(leafNibbles, value)
 				branch.setBranch(branchNibble, newLeaf)
 			}
 
@@ -212,7 +180,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 				// + 010203 good
 				extNibbles, branchNibble, extRemainingnibbles := ext.path[:matched], ext.path[matched], ext.path[matched+1:]
 				nodeBranchNibble, nodeLeafNibbles := nibbles[matched], nibbles[matched+1:]
-				branch := NewBranchNode()
+				branch := newBranchNode()
 				if len(extRemainingnibbles) == 0 {
 					// E 0102030
 					// + 010203 good
@@ -220,11 +188,11 @@ func (t *Trie) Put(key []byte, value []byte) {
 				} else {
 					// E 01020304
 					// + 010203 good
-					newExt := NewExtensionNode(extRemainingnibbles, ext.next)
+					newExt := newExtensionNode(extRemainingnibbles, ext.next)
 					branch.setBranch(branchNibble, newExt)
 				}
 
-				remainingLeaf := NewLeafNodeFromNibbles(nodeLeafNibbles, value)
+				remainingLeaf := newLeafNode(nodeLeafNibbles, value)
 				branch.setBranch(nodeBranchNibble, remainingLeaf)
 
 				// if there is no shared extension nibbles any more, then we don't need the extension node
@@ -235,7 +203,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 					*node = branch
 				} else {
 					// otherwise create a new extension node
-					*node = NewExtensionNode(extNibbles, branch)
+					*node = newExtensionNode(extNibbles, branch)
 				}
 				return
 			}
@@ -247,6 +215,48 @@ func (t *Trie) Put(key []byte, value []byte) {
 
 		panic("unknown type")
 	}
+}
+
+/// RootHash returns the root hash of the Trie.
+func (t *Trie) RootHash() []byte {
+	if t.root == nil {
+		return nilNodeHash
+	}
+
+	return t.root.hash()
+}
+
+// PreState is a slice of (Key, Value) pairs.
+type PreState = [][2][]byte
+
+// PostState is a slice of ProofNode hashes.
+type PostState = [][]byte
+
+// GetPreAndPseudoPostState returns PreState: the list of key-value pairs that have to be loaded into
+// a Trie (using `LoadPreState`) to serve reads into world state during fraud proof execution, and
+// PseudoPostState: the list of PseudoNodes that have to be loaded into a Trie (using `LoadPostState`)
+// to calculate its post state root after fraud proof execution.
+//
+// After calling this method, the Trie becomes dead.
+//
+// # Panics
+// This method panics if called when t.mode != MODE_GENERATE_FRAUD_PROOF.
+func (t *Trie) GetPreAndPseudoPostState() (PreState, PostState) {
+	if t.mode != MODE_GENERATE_FRAUD_PROOF {
+		panic("attempted to GetPreAndPseudoPostState, but Trie is not in generate fraud proof mode.")
+	}
+
+	pre_state := make([][2][]byte, 0)
+	for key, value := range t.readSet {
+		pre_state = append(pre_state, [2][]byte{[]byte(key), value})
+	}
+
+	// TODO [Alice]
+	post_state := make([][]byte, 0)
+
+	t.mode = MODE_DEAD
+
+	return pre_state, post_state
 }
 
 /// LoadFromDB populates the Trie with data from db. It returns an error if db
@@ -313,14 +323,14 @@ func (t *Trie) SaveToDB(db DB) {
 		}
 
 		if leaf, ok := currentNode.(*LeafNode); ok {
-			leafHash := leaf.ComputeHash()
-			db.Put(leafHash, leaf.asSerialBytes())
+			leafHash := leaf.hash()
+			db.Put(leafHash, leaf.serialized())
 			continue
 		}
 
 		if branch, ok := currentNode.(*BranchNode); ok {
-			branchHash := branch.ComputeHash()
-			db.Put(branchHash, branch.asSerialBytes())
+			branchHash := branch.hash()
+			db.Put(branchHash, branch.serialized())
 
 			for i := 0; i < 16; i++ {
 				if branch.branches[i] != nil {
@@ -330,27 +340,18 @@ func (t *Trie) SaveToDB(db DB) {
 		}
 
 		if ext, ok := currentNode.(*ExtensionNode); ok {
-			extHash := ext.ComputeHash()
-			db.Put(extHash, ext.asSerialBytes())
+			extHash := ext.hash()
+			db.Put(extHash, ext.serialized())
 
 			nodes = append(nodes, ext.next)
 			continue
 		}
 	}
 
-	rootHash := t.root.ComputeHash()
+	rootHash := t.root.hash()
 
 	db.Delete(rootHash)
 	db.Put([]byte("root"), serializeNode(t.root))
-}
-
-/// Hash returns the root hash of the Trie.
-func (t *Trie) Hash() []byte {
-	if t.root == nil {
-		return nilNodeHash
-	}
-
-	return t.root.ComputeHash()
 }
 
 /// WasPreStateComplete returns whether PreState was complete during fraud proof transaction execution.

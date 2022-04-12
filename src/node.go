@@ -15,14 +15,19 @@ var (
 
 type Slots = []interface{}
 
-/////////////
-// Node API
-/////////////
+////////////////////
+// General Node API
+////////////////////
 
 type Node interface {
-	ComputeHash() []byte // common.Hash
-	asSerialBytes() []byte
+	// serialized returns
+	serialized() []byte
+
+	// asSlots returns
 	asSlots() Slots
+
+	// hash returns the Keccak256 hash of the slice of bytes produced by serialized.
+	hash() []byte // common.Hash
 }
 
 func NodeFromSerialBytes(serializedNode []byte, db DB) (Node, error) {
@@ -39,6 +44,142 @@ func NodeFromSerialBytes(serializedNode []byte, db DB) (Node, error) {
 	return nodeFromRaw(Slots, db)
 }
 
+///////////////////////////
+// Branch node definitions
+///////////////////////////
+
+type BranchNode struct {
+	branches [16]Node
+	value    []byte
+}
+
+func newBranchNode() *BranchNode {
+	return &BranchNode{
+		branches: [16]Node{},
+	}
+}
+
+func (b BranchNode) serialized() []byte {
+	return serializeNode(b)
+}
+
+func (b BranchNode) asSlots() Slots {
+	slots := make(Slots, 17)
+	for i := 0; i < 16; i++ {
+		if b.branches[i] == nil {
+			slots[i] = nilNodeRaw
+		} else {
+			node := b.branches[i]
+			if len(serializeNode(node)) >= 32 {
+				slots[i] = node.hash()
+			} else {
+				// if node can be serialized to less than 32 bits, then
+				// use serialized directly.
+				// it has to be ">=", rather than ">",
+				// so that when deserialized, the content can be distinguished
+				// by length
+				slots[i] = node.asSlots()
+			}
+		}
+	}
+
+	slots[16] = b.value
+	return slots
+}
+
+func (b BranchNode) hash() []byte {
+	return crypto.Keccak256(b.serialized())
+}
+
+func (b BranchNode) hasValue() bool {
+	return b.value != nil
+}
+
+func (b *BranchNode) setBranch(nibble Nibble, node Node) {
+	b.branches[int(nibble)] = node
+}
+
+func (b *BranchNode) setValue(value []byte) {
+	b.value = value
+}
+
+///////////////////////////////
+// Extension node definitions
+///////////////////////////////
+
+type ExtensionNode struct {
+	path []Nibble
+	next Node
+}
+
+func newExtensionNode(nibbles []Nibble, next Node) *ExtensionNode {
+	return &ExtensionNode{
+		path: nibbles,
+		next: next,
+	}
+}
+
+func (e ExtensionNode) hash() []byte {
+	return crypto.Keccak256(e.serialized())
+}
+
+func (e ExtensionNode) asSlots() Slots {
+	slots := make(Slots, 2)
+	slots[0] = nibblesAsBytes(appendPrefixToNibbles(e.path, false))
+	if len(serializeNode(e.next)) >= 32 {
+		slots[1] = e.next.hash()
+	} else {
+		slots[1] = e.next.asSlots()
+	}
+	return slots
+}
+
+func (e ExtensionNode) serialized() []byte {
+	return serializeNode(e)
+}
+
+//////////////////////////
+// Leaf node definitions
+//////////////////////////
+
+type LeafNode struct {
+	path  []Nibble
+	value []byte
+}
+
+func newLeafNode(nibbles []Nibble, value []byte) *LeafNode {
+	return &LeafNode{
+		path:  nibbles,
+		value: value,
+	}
+}
+
+func (l LeafNode) hash() []byte {
+	return crypto.Keccak256(l.serialized())
+}
+
+func (l LeafNode) asSlots() Slots {
+	path := nibblesAsBytes(appendPrefixToNibbles(l.path, true))
+	raw := Slots{path, l.value}
+	return raw
+}
+
+func (l LeafNode) serialized() []byte {
+	return serializeNode(l)
+}
+
+//////////////////////////
+// ProofNode definitions
+//////////////////////////
+
+type ProofNode struct {
+	hash []byte
+}
+
+////////////////////////////////
+// General node implementations
+////////////////////////////////
+
 // TODO [Alice]: explain the difference between a node and a serializedNode.
 func nodeFromRaw(node Slots, db DB) (Node, error) {
 	if len(node) == 0 {
@@ -49,7 +190,7 @@ func nodeFromRaw(node Slots, db DB) (Node, error) {
 		////////////////////
 		// Is a BranchNode.
 		////////////////////
-		branchNode := NewBranchNode()
+		branchNode := newBranchNode()
 
 		for i := 0; i < 16; i++ {
 			branch := node[i]
@@ -109,14 +250,14 @@ func nodeFromRaw(node Slots, db DB) (Node, error) {
 			///////////////////
 			// Is a LeafNode.
 			///////////////////
-			leafNode := NewLeafNodeFromNibbles(nibbles, node[1].([]byte))
+			leafNode := newLeafNode(nibbles, node[1].([]byte))
 			return leafNode, nil
 
 		} else {
 			////////////////////////
 			// Is an ExtensionNode.
 			////////////////////////
-			extensionNode := NewExtensionNode(nibbles, nil)
+			extensionNode := newExtensionNode(nibbles, nil)
 			rawNextNode := node[1]
 
 			if rawNextNodeBytes, ok := rawNextNode.([]byte); ok {
@@ -173,152 +314,4 @@ func serializeNode(node Node) []byte {
 	}
 
 	return rlp
-}
-
-///////////////////////////
-// Branch node definitions
-///////////////////////////
-
-type BranchNode struct {
-	branches [16]Node
-	value    []byte
-}
-
-func NewBranchNode() *BranchNode {
-	return &BranchNode{
-		branches: [16]Node{},
-	}
-}
-
-func (b BranchNode) asSerialBytes() []byte {
-	return serializeNode(b)
-}
-
-func (b BranchNode) asSlots() Slots {
-	slots := make(Slots, 17)
-	for i := 0; i < 16; i++ {
-		if b.branches[i] == nil {
-			slots[i] = nilNodeRaw
-		} else {
-			node := b.branches[i]
-			if len(serializeNode(node)) >= 32 {
-				slots[i] = node.ComputeHash()
-			} else {
-				// if node can be serialized to less than 32 bits, then
-				// use Serialized directly.
-				// it has to be ">=", rather than ">",
-				// so that when deserialized, the content can be distinguished
-				// by length
-				slots[i] = node.asSlots()
-			}
-		}
-	}
-
-	slots[16] = b.value
-	return slots
-}
-
-func (b BranchNode) ComputeHash() []byte {
-	return crypto.Keccak256(b.asSerialBytes())
-}
-
-func (b BranchNode) hasValue() bool {
-	return b.value != nil
-}
-
-func (b *BranchNode) setBranch(nibble Nibble, node Node) {
-	b.branches[int(nibble)] = node
-}
-
-func (b *BranchNode) setValue(value []byte) {
-	b.value = value
-}
-
-///////////////////////////////
-// Extension node definitions
-///////////////////////////////
-
-type ExtensionNode struct {
-	path []Nibble
-	next Node
-}
-
-func NewExtensionNode(nibbles []Nibble, next Node) *ExtensionNode {
-	return &ExtensionNode{
-		path: nibbles,
-		next: next,
-	}
-}
-
-func (e ExtensionNode) ComputeHash() []byte {
-	return crypto.Keccak256(e.asSerialBytes())
-}
-
-func (e ExtensionNode) asSlots() Slots {
-	slots := make(Slots, 2)
-	slots[0] = nibblesAsBytes(appendPrefixToNibbles(e.path, false))
-	if len(serializeNode(e.next)) >= 32 {
-		slots[1] = e.next.ComputeHash()
-	} else {
-		slots[1] = e.next.asSlots()
-	}
-	return slots
-}
-
-func (e ExtensionNode) asSerialBytes() []byte {
-	return serializeNode(e)
-}
-
-//////////////////////////
-// Leaf node definitions
-//////////////////////////
-
-type LeafNode struct {
-	path  []Nibble
-	value []byte
-}
-
-func NewLeafNodeFromNibbles(nibbles []Nibble, value []byte) *LeafNode {
-	return &LeafNode{
-		path:  nibbles,
-		value: value,
-	}
-}
-
-// TODO [Alice]: Marked for deletion.
-func NewLeafNodeFromNibbleBytes(nibbles []byte, value []byte) (*LeafNode, error) {
-	ns, err := bytesAsNibbles(nibbles)
-	if err != nil {
-		return nil, fmt.Errorf("could not leaf node from nibbles: %w", err)
-	}
-
-	return NewLeafNodeFromNibbles(ns, value), nil
-}
-
-// TODO [Alice]: Marked for deletion.
-func NewLeafNodeFromBytes(key, value []byte) *LeafNode {
-	return NewLeafNodeFromNibbles(newNibblesFromBytes(key), value)
-}
-
-func (l LeafNode) ComputeHash() []byte {
-	return crypto.Keccak256(l.asSerialBytes())
-}
-
-func (l LeafNode) asSlots() Slots {
-	path := nibblesAsBytes(appendPrefixToNibbles(l.path, true))
-	raw := Slots{path, l.value}
-	return raw
-}
-
-func (l LeafNode) asSerialBytes() []byte {
-	return serializeNode(l)
-}
-
-//////////////////////////
-// ProofNode definitions
-//////////////////////////
-
-type ProofNode struct {
-	path []Nibble
-	hash []byte
 }

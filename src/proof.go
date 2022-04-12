@@ -69,7 +69,7 @@ func (t *Trie) Prove(key []byte) (Proof, bool) {
 			return nil, false
 		}
 
-		proof.Put(node.ComputeHash(), serializeNode(node))
+		proof.Put(node.hash(), serializeNode(node))
 
 		if leaf, ok := node.(*LeafNode); ok {
 			matched := commonPrefixLength(leaf.path, nibbles)
