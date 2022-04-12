@@ -69,7 +69,7 @@ func (t *Trie) Prove(key []byte) (Proof, bool) {
 			return nil, false
 		}
 
-		proof.Put(node.asHash(), serializeNode(node))
+		proof.Put(node.ComputeHash(), serializeNode(node))
 
 		if leaf, ok := node.(*LeafNode); ok {
 			matched := PrefixMatchedLen(leaf.path, nibbles)

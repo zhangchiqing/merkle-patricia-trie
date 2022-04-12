@@ -24,7 +24,7 @@ func TestDeserializeNodes(t *testing.T) {
 		branchNode.value = []byte("VEGETA")
 
 		mockDB := NewMockDB()
-		mockDB.Put(leafNode2.asHash(), leafNode2.asSerialBytes())
+		mockDB.Put(leafNode2.ComputeHash(), leafNode2.asSerialBytes())
 
 		serializedBranchNode := branchNode.asSerialBytes()
 		deserializedBranchNode, err := NodeFromSerialBytes(serializedBranchNode, mockDB)
@@ -55,7 +55,7 @@ func TestDeserializeNodes(t *testing.T) {
 
 		extensionNode.next = nextNode
 		mockDB := NewMockDB()
-		mockDB.Put(nextNode.asHash(), nextNode.asSerialBytes())
+		mockDB.Put(nextNode.ComputeHash(), nextNode.asSerialBytes())
 
 		serializedExtensionNode := extensionNode.asSerialBytes()
 		deserializedExtensionNode, err := NodeFromSerialBytes(serializedExtensionNode, mockDB)
@@ -94,7 +94,7 @@ func TestBranch(t *testing.T) {
 	require.Equal(t, "ddc882350684636f696e8080808080808080808080808080808476657262",
 		fmt.Sprintf("%x", b.asSerialBytes()))
 	require.Equal(t, "d757709f08f7a81da64a969200e59ff7e6cd6b06674c3f668ce151e84298aa79",
-		fmt.Sprintf("%x", b.asHash()))
+		fmt.Sprintf("%x", b.ComputeHash()))
 
 }
 
@@ -117,7 +117,7 @@ func TestExtensionNode(t *testing.T) {
 	require.NoError(t, err)
 	e := NewExtensionNode(ns, b)
 	require.Equal(t, "e4850001020304ddc882350684636f696e8080808080808080808080808080808476657262", fmt.Sprintf("%x", e.asSerialBytes()))
-	require.Equal(t, "64d67c5318a714d08de6958c0e63a05522642f3f1087c6fd68a97837f203d359", fmt.Sprintf("%x", e.asHash()))
+	require.Equal(t, "64d67c5318a714d08de6958c0e63a05522642f3f1087c6fd68a97837f203d359", fmt.Sprintf("%x", e.ComputeHash()))
 }
 
 func TestLeafHash(t *testing.T) {
@@ -155,7 +155,7 @@ func Test3Nibbles(t *testing.T) {
 func TestLeafNode(t *testing.T) {
 	nibbles, value := []byte{1, 2, 3, 4}, []byte("verb")
 	l := NewLeafNodeFromBytes(nibbles, value)
-	require.Equal(t, "2bafd1eef58e8707569b7c70eb2f91683136910606ba7e31d07572b8b67bf5c6", fmt.Sprintf("%x", l.asHash()))
+	require.Equal(t, "2bafd1eef58e8707569b7c70eb2f91683136910606ba7e31d07572b8b67bf5c6", fmt.Sprintf("%x", l.ComputeHash()))
 }
 
 func TestLeafNode2(t *testing.T) {
@@ -163,7 +163,7 @@ func TestLeafNode2(t *testing.T) {
 	nibbles, value := []byte{5, 0, 6}, []byte("coin")
 	l, err := NewLeafNodeFromNibbleBytes(nibbles, value)
 	require.NoError(t, err)
-	require.Equal(t, "c37ec985b7a88c2c62beb268750efe657c36a585beb435eb9f43b839846682ce", fmt.Sprintf("%x", l.asHash()))
+	require.Equal(t, "c37ec985b7a88c2c62beb268750efe657c36a585beb435eb9f43b839846682ce", fmt.Sprintf("%x", l.ComputeHash()))
 }
 
 func printEachCalculationSteps(key, value []byte, isLeaf bool) map[string]string {

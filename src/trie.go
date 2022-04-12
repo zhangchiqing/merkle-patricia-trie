@@ -313,13 +313,13 @@ func (t *Trie) SaveToDB(db DB) {
 		}
 
 		if leaf, ok := currentNode.(*LeafNode); ok {
-			leafHash := leaf.asHash()
+			leafHash := leaf.ComputeHash()
 			db.Put(leafHash, leaf.asSerialBytes())
 			continue
 		}
 
 		if branch, ok := currentNode.(*BranchNode); ok {
-			branchHash := branch.asHash()
+			branchHash := branch.ComputeHash()
 			db.Put(branchHash, branch.asSerialBytes())
 
 			for i := 0; i < 16; i++ {
@@ -330,7 +330,7 @@ func (t *Trie) SaveToDB(db DB) {
 		}
 
 		if ext, ok := currentNode.(*ExtensionNode); ok {
-			extHash := ext.asHash()
+			extHash := ext.ComputeHash()
 			db.Put(extHash, ext.asSerialBytes())
 
 			nodes = append(nodes, ext.next)
@@ -338,7 +338,7 @@ func (t *Trie) SaveToDB(db DB) {
 		}
 	}
 
-	rootHash := t.root.asHash()
+	rootHash := t.root.ComputeHash()
 
 	// TOD0 [Alice]: Ask Ahsan why these two lines (it /was/ two lines when
 	// WriteBatch was still a thing) were originally swapped.
@@ -354,7 +354,7 @@ func (t *Trie) Hash() []byte {
 		return nilNodeHash
 	}
 
-	return t.root.asHash()
+	return t.root.ComputeHash()
 }
 
 /// WasPreStateComplete returns whether PreState was complete during fraud proof transaction execution.

@@ -8,26 +8,21 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-////////////
-// Globals
-////////////
-
 var (
 	nilNodeRaw     = []byte{}
 	nilNodeHash, _ = hex.DecodeString("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 )
 
-// TODO [Alice]: factor this out to the three node types.
-type RawNode = []interface{}
+type Slots = []interface{}
 
 /////////////
 // Node API
 /////////////
 
 type Node interface {
-	asHash() []byte // common.Hash
+	ComputeHash() []byte // common.Hash
 	asSerialBytes() []byte
-	asRaw() RawNode
+	asSlots() Slots
 }
 
 func NodeFromSerialBytes(serializedNode []byte, db DB) (Node, error) {
@@ -35,17 +30,17 @@ func NodeFromSerialBytes(serializedNode []byte, db DB) (Node, error) {
 		return nil, nil
 	}
 
-	var rawNode RawNode
-	err := rlp.DecodeBytes(serializedNode, &rawNode)
+	var Slots Slots
+	err := rlp.DecodeBytes(serializedNode, &Slots)
 	if err != nil {
 		return nil, err
 	}
 
-	return nodeFromRaw(rawNode, db)
+	return nodeFromRaw(Slots, db)
 }
 
 // TODO [Alice]: explain the difference between a node and a serializedNode.
-func nodeFromRaw(node RawNode, db DB) (Node, error) {
+func nodeFromRaw(node Slots, db DB) (Node, error) {
 	if len(node) == 0 {
 		return nil, fmt.Errorf("serializedNode is empty")
 	}
@@ -76,7 +71,7 @@ func nodeFromRaw(node RawNode, db DB) (Node, error) {
 
 					branchNode.branches[i] = deserializedNode
 				}
-			} else if rawBranchBytes, ok := branch.(RawNode); ok {
+			} else if rawBranchBytes, ok := branch.(Slots); ok {
 				/////////////////////
 				// Branch is a node.
 				/////////////////////
@@ -89,7 +84,7 @@ func nodeFromRaw(node RawNode, db DB) (Node, error) {
 					branchNode.branches[i] = deserializedNode
 				}
 			} else {
-				return nil, fmt.Errorf("node seems to be a branch node, but its branches cannot be casted into either a hash or a RawNode")
+				return nil, fmt.Errorf("node seems to be a branch node, but its branches cannot be casted into either a hash or a Slots")
 			}
 		}
 
@@ -141,7 +136,7 @@ func nodeFromRaw(node RawNode, db DB) (Node, error) {
 					}
 					extensionNode.next = deserializedNode
 				}
-			} else if rawNextNodeBytes, ok := rawNextNode.(RawNode); ok {
+			} else if rawNextNodeBytes, ok := rawNextNode.(Slots); ok {
 				////////////////////////
 				// Next node is a node.
 				////////////////////////
@@ -168,7 +163,7 @@ func serializeNode(node Node) []byte {
 	if node == nil {
 		raw = nilNodeRaw
 	} else {
-		raw = node.asRaw()
+		raw = node.asSlots()
 	}
 
 	rlp, err := rlp.EncodeToBytes(raw)
@@ -199,22 +194,22 @@ func (b BranchNode) asSerialBytes() []byte {
 	return serializeNode(b)
 }
 
-func (b BranchNode) asRaw() RawNode {
-	slots := make(RawNode, 17)
+func (b BranchNode) asSlots() Slots {
+	slots := make(Slots, 17)
 	for i := 0; i < 16; i++ {
 		if b.branches[i] == nil {
 			slots[i] = nilNodeRaw
 		} else {
 			node := b.branches[i]
 			if len(serializeNode(node)) >= 32 {
-				slots[i] = node.asHash()
+				slots[i] = node.ComputeHash()
 			} else {
 				// if node can be serialized to less than 32 bits, then
 				// use Serialized directly.
 				// it has to be ">=", rather than ">",
 				// so that when deserialized, the content can be distinguished
 				// by length
-				slots[i] = node.asRaw()
+				slots[i] = node.asSlots()
 			}
 		}
 	}
@@ -223,7 +218,7 @@ func (b BranchNode) asRaw() RawNode {
 	return slots
 }
 
-func (b BranchNode) asHash() []byte {
+func (b BranchNode) ComputeHash() []byte {
 	return crypto.Keccak256(b.asSerialBytes())
 }
 
@@ -255,17 +250,17 @@ func NewExtensionNode(nibbles []Nibble, next Node) *ExtensionNode {
 	}
 }
 
-func (e ExtensionNode) asHash() []byte {
+func (e ExtensionNode) ComputeHash() []byte {
 	return crypto.Keccak256(e.asSerialBytes())
 }
 
-func (e ExtensionNode) asRaw() RawNode {
-	slots := make(RawNode, 2)
+func (e ExtensionNode) asSlots() Slots {
+	slots := make(Slots, 2)
 	slots[0] = NibblesAsBytes(AppendPrefixToNibbles(e.path, false))
 	if len(serializeNode(e.next)) >= 32 {
-		slots[1] = e.next.asHash()
+		slots[1] = e.next.ComputeHash()
 	} else {
-		slots[1] = e.next.asRaw()
+		slots[1] = e.next.asSlots()
 	}
 	return slots
 }
@@ -305,13 +300,13 @@ func NewLeafNodeFromBytes(key, value []byte) *LeafNode {
 	return NewLeafNodeFromNibbles(NewNibblesFromBytes(key), value)
 }
 
-func (l LeafNode) asHash() []byte {
+func (l LeafNode) ComputeHash() []byte {
 	return crypto.Keccak256(l.asSerialBytes())
 }
 
-func (l LeafNode) asRaw() RawNode {
+func (l LeafNode) asSlots() Slots {
 	path := NibblesAsBytes(AppendPrefixToNibbles(l.path, true))
-	raw := RawNode{path, l.value}
+	raw := Slots{path, l.value}
 	return raw
 }
 
