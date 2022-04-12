@@ -26,13 +26,13 @@ func AreEqualTries(root1 Node, root2 Node) bool {
 	root2Branch, root2IsBranch := root2.(*BranchNode)
 
 	if root1IsBranch && root2IsBranch {
-		areBranchesEqual := true
+		branchesAreEqual := true
 		for i := 0; i < 16; i++ {
-			areBranchesEqual = areBranchesEqual && AreEqualTries(root1Branch.branches[i], root2Branch.branches[i])
+			branchesAreEqual = branchesAreEqual && AreEqualTries(root1Branch.branches[i], root2Branch.branches[i])
 		}
 
-		res := areBranchesEqual && reflect.DeepEqual(root1Branch.value, root2Branch.value)
-		if res == false {
+		res := branchesAreEqual && reflect.DeepEqual(root1Branch.value, root2Branch.value)
+		if branchesAreEqual && reflect.DeepEqual(root1Branch.value, root2Branch.value) == false {
 			fmt.Println(root1Branch, root2Branch, root1Branch.value == nil, root2Branch.value == nil)
 		}
 		return res
