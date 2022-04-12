@@ -1,6 +1,6 @@
 package mpt
 
-import "fmt"
+import "reflect"
 
 // Trie is an in-memory representation of a Merkle Patricia Trie using RLP-encoding.
 // Trie supports loading data from, and saving data to, persistent storage using the
@@ -42,19 +42,32 @@ type Trie struct {
 	root Node
 	mode TrieMode
 
-	// TODO [Alice]: using string as a key here is non-ideal.
-	// readSet is non-nil only if mode == MODE_GENERATE_FRAUD_PROOF
-	readSet map[string][]byte
+	// readSet, preStateProofNodes, and writeList are non-Nil only when mode == MODE_GENERATE_FRAUD_PROOF.
+	readSet            []KVPair
+	preStateProofNodes []ProofNode
+	writeList          []KVPair
 }
 
-type TrieMode uint
+type TrieMode = uint
 
 const (
 	MODE_NORMAL               TrieMode = 0
 	MODE_GENERATE_FRAUD_PROOF TrieMode = 1
 	MODE_VERIFY_FRAUD_PROOF   TrieMode = 2
-	MODE_DEAD                 TrieMode = 3
+	MODE_FAILED_FRAUD_PROOF   TrieMode = 3
+	MODE_DEAD                 TrieMode = 4
 )
+
+type KVPair struct {
+	key   []byte
+	value []byte
+}
+
+// PreState is an array of either: ProofNode, or KVPair.
+type PreState []interface{}
+
+// PostState is an array of ProofNodes.
+type PostState []ProofNode
 
 // NewTrie returns an empty Trie in the specified, immutable mode.
 func NewTrie(mode TrieMode) *Trie {
@@ -74,20 +87,49 @@ func (t *Trie) Get(key []byte) []byte {
 		panic("attempted to use dead Trie. Read Trie documentation.")
 	}
 
-	if t.mode == MODE_NORMAL {
-		return t.getFromTrie(key)
-	} else if t.mode == MODE_GENERATE_FRAUD_PROOF {
-		value := t.getFromTrie(key)
+	switch true {
+	case t.mode == MODE_NORMAL:
+		return t.getNormally(key)
+	case t.mode == MODE_GENERATE_FRAUD_PROOF:
+		// 1. At this expected stage in the Trie lifecycle, writeList would not have been committed into
+		// Trie, so first, try to get from writeList.
+		getFrom := func(writeList []KVPair, key []byte) []byte {
+			// Range through writeList from the rear to get the latest value.
+			for i := len(t.writeList) - 1; i >= 0; i-- {
+				kvPair := t.writeList[i]
+				if reflect.DeepEqual(key, kvPair.key) {
+					return kvPair.value
+				}
+			}
 
-		key_as_string := fmt.Sprintf("%x", key)
-		if _, exists := t.readSet[key_as_string]; !exists {
-			t.readSet[key_as_string] = value
+			return nil
+		}
+		value := getFrom(t.writeList, key)
+		if value != nil {
+			return value
+		}
+
+		// 2. The key has not been updated in the writeList, so, try to get it from the Trie.
+		value = t.getNormally(key)
+		inReadSet := func(readSet []KVPair, key []byte) bool {
+			for _, kvPair := range readSet {
+				if reflect.DeepEqual(key, kvPair.key) {
+					return true
+				}
+			}
+			return false
+		}
+		// There's no need to add KVPair to readSet if it is already in there.
+		if !inReadSet(t.readSet, key) {
+			t.readSet = append(t.readSet, KVPair{key, value})
 		}
 
 		return value
-	} else { // if t.mode == MODE_VERIFY_FRAUD_PROOF
-		// TODO [Alice]: differentiate between incomplete pre-state and actually-non-existent key.
-		return t.getFromTrie(key)
+	case t.mode == MODE_VERIFY_FRAUD_PROOF:
+		// TODO [Alice]: differentiate between incomplete PreState and actually non-existent KV pair.
+		return t.getNormally(key)
+	default:
+		panic("unreachable code")
 	}
 }
 
@@ -226,12 +268,6 @@ func (t *Trie) RootHash() []byte {
 	return t.root.hash()
 }
 
-// PreState is a slice of (Key, Value) pairs.
-type PreState = [][2][]byte
-
-// PostState is a slice of ProofNode hashes.
-type PostState = [][]byte
-
 // GetPreAndPseudoPostState returns PreState: the list of key-value pairs that have to be loaded into
 // a Trie (using `LoadPreState`) to serve reads into world state during fraud proof execution, and
 // PseudoPostState: the list of PseudoNodes that have to be loaded into a Trie (using `LoadPostState`)
@@ -246,17 +282,17 @@ func (t *Trie) GetPreAndPseudoPostState() (PreState, PostState) {
 		panic("attempted to GetPreAndPseudoPostState, but Trie is not in generate fraud proof mode.")
 	}
 
-	pre_state := make([][2][]byte, 0)
-	for key, value := range t.readSet {
-		pre_state = append(pre_state, [2][]byte{[]byte(key), value})
+	preState := make(PreState, 0)
+	for _, kvPair := range t.readSet {
+		preState = append(preState, interface{}(kvPair))
 	}
 
 	// TODO [Alice]
-	post_state := make([][]byte, 0)
+	post_state := make(PostState, 0)
 
 	t.mode = MODE_DEAD
 
-	return pre_state, post_state
+	return preState, post_state
 }
 
 /// LoadFromDB populates the Trie with data from db. It returns an error if db
@@ -284,16 +320,21 @@ func (t *Trie) LoadFromDB(db DB) error {
 ///
 /// # Panics
 /// This method panics if called when t.mode != MODE_VERIFY_FRAUD_PROOF
-func (t *Trie) LoadPreState(pre_state PreState) {
+func (t *Trie) LoadPreState(preState PreState) {
 	if t.mode != MODE_VERIFY_FRAUD_PROOF {
 		panic("")
 	}
 
-	for _, kv_pair := range pre_state {
-		key := kv_pair[0]
-		value := kv_pair[1]
-
-		t.Put(key, value)
+	for _, kvPairOrProofNode := range preState {
+		switch v := kvPairOrProofNode.(type) {
+		case ProofNode:
+			// TODO [Alice]
+			panic("")
+		case KVPair:
+			t.Put(v.key, v.value)
+		default:
+			panic("unreachable code")
+		}
 	}
 }
 
@@ -369,7 +410,7 @@ func (t *Trie) WasPreStateComplete() bool {
 // Private methods
 ////////////////////
 
-func (t *Trie) getFromTrie(key []byte) []byte {
+func (t *Trie) getNormally(key []byte) []byte {
 	node := t.root
 	nibbles := newNibbles(key)
 	for {

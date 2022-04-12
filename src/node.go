@@ -91,10 +91,6 @@ func (b BranchNode) hash() []byte {
 	return crypto.Keccak256(b.serialized())
 }
 
-func (b BranchNode) hasValue() bool {
-	return b.value != nil
-}
-
 func (b *BranchNode) setBranch(nibble Nibble, node Node) {
 	b.branches[int(nibble)] = node
 }

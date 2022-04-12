@@ -1,0 +1,15 @@
+1. Implement Node interface for ProofNode.
+2. Extend Node interface to get parent node.
+3. Define protobuf message types for PreStateAndPostState.
+4. Implement the "GetPreState" routine for GetPreStateAndPostState.
+	a. Extend Get method to, in case it is called on a Trie in MODE_GENERATE_FRAUD_PROOF,
+	   also capture all of the proof nodes necessary to proof the inclusion of the gotten
+	   LeafNode (if it exists), 
+	b. ...or the lowest potential ancestor of that node (if it doesn't*).
+5. Implement the "MinimizePreState" routine for GetPreStateAndPostState.
+	a. Iterate through (un-minimized) PreState. Remove redundant ProofNodes.
+	b. and then, partially sort PreState to have (Key, Value) pairs appear after 
+	   ProofNodes. This guarantees when PreState is loaded start-to-end in LoadPreState, 
+	   ProofNodes do not accidentally override (Key, Value) pairs.
+5. Implement LoadPreState.
+6. Implement WasPreStateComplete (together with *).

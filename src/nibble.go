@@ -37,6 +37,13 @@ func bytesAsNibbles(nibbles ...byte) ([]Nibble, error) {
 	return ns, nil
 }
 
+// isNibble returns whether b is a value within the range [0, 16) and therefore can be used to create a Nibble.
+func isNibble(b byte) bool {
+	n := int(b)
+	// 0-9 | a-f
+	return n >= 0 && n < 16
+}
+
 // nibblesAsBytes converts a slice of nibbles to a byte slice assuming the nibble slice has even
 // number of nibbles.
 func nibblesAsBytes(ns []Nibble) []byte {
@@ -125,11 +132,4 @@ func commonPrefixLength(ns1 []Nibble, ns2 []Nibble) int {
 	}
 
 	return matched
-}
-
-// isNibble returns whether b is a value within the range [0, 16) and therefore can be used to create a Nibble.
-func isNibble(b byte) bool {
-	n := int(b)
-	// 0-9 | a-f
-	return n >= 0 && n < 16
 }

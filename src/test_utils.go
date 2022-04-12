@@ -16,7 +16,7 @@ func AreEqualTries(root1 Node, root2 Node) bool {
 
 	if root1IsExt && root2IsExt {
 		res := reflect.DeepEqual(root1Ext.path, root2Ext.path) && AreEqualTries(root1Ext.next, root2Ext.next)
-		if res == false {
+		if !res {
 			fmt.Println(root1Ext, root2Ext)
 		}
 		return res
@@ -43,7 +43,7 @@ func AreEqualTries(root1 Node, root2 Node) bool {
 
 	if root1IsLeaf && root2IsLeaf {
 		res := reflect.DeepEqual(root1Leaf.path, root2Leaf.path) && reflect.DeepEqual(root1Leaf.value, root2Leaf.value)
-		if res == false {
+		if !res {
 			fmt.Println(root1Leaf, root2Leaf)
 		}
 		return res
