@@ -87,7 +87,7 @@ func (b BranchNode) asSlots() Slots {
 			if len(serializeNode(node)) >= 32 {
 				slots[i] = node.hash()
 			} else {
-				// if node can be serialized to less than 32 bits, then
+				// if node can be serialized to less than 32 bytes, then
 				// use serialized directly.
 				// it has to be ">=", rather than ">",
 				// so that when deserialized, the content can be distinguished

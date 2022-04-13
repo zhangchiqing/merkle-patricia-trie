@@ -195,8 +195,6 @@ func (t *Trie) Put(key []byte, value []byte) {
 				branchNibble, leafNibbles := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
 				newLeaf := newLeafNode(leafNibbles, value)
 				branch.setBranch(branchNibble, newLeaf)
-			} else {
-				// TODO [Alice]
 			}
 
 			if lenCommonPrefix > 0 {
@@ -663,11 +661,11 @@ func (t *Trie) putProofNode(completePath []Nibble, hash []byte) error {
 				//
 				// This case cannot be entered in LoadPreState and LoadPostState.
 				// Informal argument: remainingPath should not be fully consumed at this point.
-				return fmt.Errorf("TODO [Alice] remainingPath should not be fully consumed at this point")
+				return fmt.Errorf("TODO [Alice] are you sure this should error?")
 			} else if lenCommonPrefix == len(proofNode.path) {
 				// Case 3: remainingPath is a superstring of leaf.path. In other words,
 				// remainingPath contains excess nibbles beyond what leaf.path can 'satisfy'.
-				return fmt.Errorf("TODO [Alice]")
+				return fmt.Errorf("TODO [Alice] are you sure this should error?")
 			}
 
 			if lenCommonPrefix > 0 {
