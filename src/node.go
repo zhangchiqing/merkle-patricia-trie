@@ -20,16 +20,25 @@ type Slots = []interface{}
 ////////////////////
 
 type Node interface {
-	// serialized returns
-	serialized() []byte
-
-	// asSlots returns
+	// asSlots returns the 'raw', non-RLP encoded slice of bytes representation of this node.
 	asSlots() Slots
 
-	// hash returns the Keccak256 hash of the slice of bytes produced by serialized.
+	// serialized returns the RLP encoding of the slots representation of this node.
+	serialized() []byte
+
+	// hash returns the Keccak256 hash of the slice of bytes produced by calling serialized on this node.
 	hash() []byte // common.Hash
 }
 
+// NodeFromSerialBytes returns a Node produced by RLP-decoding serializedNode, and then recursively doing the same for its children as
+// found in db.
+//
+// # Errors
+// 1. Returns an error if serializedNode is not valid RLP.
+// 2. Returns an error if serializedNode or its children contains a pointer to a node that is not in the database.
+//
+// Error case 2 can only happen if trie is in mode == MODE_VERIFY_FRAUD_PROOF. When it happens in this case, it implies that the challenge
+// message did not provide a complete PreState.
 func NodeFromSerialBytes(serializedNode []byte, db DB) (Node, error) {
 	if serializedNode == nil {
 		return nil, nil
@@ -168,8 +177,37 @@ func (l LeafNode) serialized() []byte {
 // ProofNode definitions
 //////////////////////////
 
+// ProofNode replace BranchNodes, ExtensionNodes, and LeafNodes whose values are not needed during Fraud Proof execution, but
+// whose hashes are needed to prove the Trie's root hash. This reduces the space complexity of Challenge messages.
+//
+// ProofNodes are inserted into the Trie only using the PutProofNode method, therefore, ProofNodes only appear in Tries with
+// mode == MODE_VERIFY_FRAUD_PROOF.
 type ProofNode struct {
-	hash []byte
+	_hash []byte
+}
+
+func newProofNode(hash []byte) *ProofNode {
+	return &ProofNode{
+		_hash: hash,
+	}
+}
+
+func (p ProofNode) hash() []byte {
+	return p._hash
+}
+
+// asSlots returns ProofNode's slots representation. The selection of a byte with value 16 for the first slot "magicSlot"
+// is deliberate: because the byte 16 will never appear in the slots representation of any other kind of node, this allows us
+// to perfectly disambiguate between a serialized ProofNode and a serialization of any other kind of node.
+func (p ProofNode) asSlots() Slots {
+	var magicSlot byte = 16
+	slots := Slots{magicSlot, p.hash}
+
+	return slots
+}
+
+func (p ProofNode) serialized() []byte {
+	return serializeNode(p)
 }
 
 ////////////////////////////////
@@ -199,6 +237,10 @@ func nodeFromRaw(node Slots, db DB) (Node, error) {
 					if err != nil {
 						// SAFETY: failing to get from database is a fatal error.
 						panic(err)
+					}
+
+					if serializedNodeFromDB == nil {
+						return nil, fmt.Errorf("branch node contains a pointer to a non-existent node")
 					}
 
 					deserializedNode, err := NodeFromSerialBytes(serializedNodeFromDB, db)
@@ -265,6 +307,10 @@ func nodeFromRaw(node Slots, db DB) (Node, error) {
 					// SAFETY: failing to get from database is a fatal error.
 					if err != nil {
 						panic(err)
+					}
+
+					if serializedNodeFromDB == nil {
+						return nil, fmt.Errorf("extension node contains a pointer to a non-existent node")
 					}
 
 					deserializedNode, err := NodeFromSerialBytes(serializedNodeFromDB, db)

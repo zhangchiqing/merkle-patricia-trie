@@ -453,3 +453,7 @@ func (t *Trie) getNormally(key []byte) []byte {
 		panic("not found")
 	}
 }
+
+func (t *Trie) putProofNode(path []Nibble, proofNode ProofNode) {
+	// TODO [Alice]
+}

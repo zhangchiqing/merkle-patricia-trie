@@ -1,5 +1,7 @@
-1. Implement Node interface for ProofNode.
-2. Extend Node interface to get parent node.
+1. Implement Node interface for ProofNode. Add a 'magic prefix' to easily distinguish a
+   ProofNode from pointers, LeafNodes, and ExtensionNodes - Done.
+2. Implement PutProofNode, a method of Trie that can only be called if mode ==
+   MODE_VERIFY_FRAUD_PROOF.
 3. Define protobuf message types for PreStateAndPostState.
 4. Implement the "GetPreState" routine for GetPreStateAndPostState.
 	a. Extend Get method to, in case it is called on a Trie in MODE_GENERATE_FRAUD_PROOF,
