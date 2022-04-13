@@ -145,33 +145,35 @@ func (t *Trie) Put(key []byte, value []byte) {
 	// need to use pointer, so that I can update root in place without
 	// keeping track of the parent node
 	node := &t.root
-	remainingNibbles := newNibbles(key)
+	remainingPath := newNibbles(key)
 	for {
 		if *node == nil {
-			leaf := newLeafNode(remainingNibbles, value)
+			leaf := newLeafNode(remainingPath, value)
 			*node = leaf
 			return
 		}
 
-		if leaf, ok := (*node).(*LeafNode); ok {
-			lenCommonPrefix := commonPrefixLength(remainingNibbles, leaf.path)
+		switch n := (*node).(type) {
+		case *LeafNode:
+			leaf := n
+			lenCommonPrefix := commonPrefixLength(remainingPath, leaf.path)
 
-			// Case 1: leaf.path == remainingNibbles.
+			// Case 1: leaf.path == remainingPath.
 			//
-			// Illustration:
+			// Illust.:
 			// ... -> Leaf {value}
-			if lenCommonPrefix == len(remainingNibbles) && lenCommonPrefix == len(leaf.path) {
+			if lenCommonPrefix == len(remainingPath) && lenCommonPrefix == len(leaf.path) {
 				newLeaf := newLeafNode(leaf.path, value)
 				*node = newLeaf
 				return
 			}
 
 			branch := newBranchNode()
-			if lenCommonPrefix == len(remainingNibbles) {
-				// Case 2: leaf.path is a superstring of remainingNibbles. In other words, leaf.path
-				// contains excess nibbles beyond remainingNibbles.
+			if lenCommonPrefix == len(remainingPath) {
+				// Case 2: leaf.path is a superstring of remainingPath. In other words, leaf.path
+				// contains excess nibbles beyond remainingPath.
 				//
-				// Illustration:
+				// Illust.:
 				// ... -> branch {value}
 				//           ⤷ Leaf {(leaf.path - commonPrefix)[1:], leaf.value}
 				branch.setValue(value)
@@ -179,14 +181,14 @@ func (t *Trie) Put(key []byte, value []byte) {
 				newLeaf := newLeafNode(leafNibbles, leaf.value)
 				branch.setBranch(branchNibble, newLeaf)
 			} else if lenCommonPrefix == len(leaf.path) {
-				// Case 3: remainingNibbles is a superstring of remainingNibbles. In other words,
-				// remainingNibbles contains excess nibbles beyond what leaf.path can 'satisfy'.
+				// Case 3: remainingPath is a superstring of remainingPath. In other words,
+				// remainingPath contains excess nibbles beyond what leaf.path can 'satisfy'.
 				//
-				// Illustration:
+				// Illust.:
 				// ... -> branch {leaf.value}
 				//          ⤷ Leaf {(remainingPath - commonPrefix)[1:], value}
 				branch.setValue(leaf.value)
-				branchNibble, leafNibbles := remainingNibbles[lenCommonPrefix], remainingNibbles[lenCommonPrefix+1:]
+				branchNibble, leafNibbles := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
 				newLeaf := newLeafNode(leafNibbles, value)
 				branch.setBranch(branchNibble, newLeaf)
 			}
@@ -194,81 +196,96 @@ func (t *Trie) Put(key []byte, value []byte) {
 			// if there is matched nibbles, an extension node will be created
 			if lenCommonPrefix > 0 {
 				// Regardless of whether Case 2 or Case 3, if a commonPrefix exists, we place it in an
-				// ExtensionNode.
+				// ExtensionNode which sits before branch.
 				//
-				// Illustration:
+				// Illust.:
 				// ... -> ExtensionNode {commonPrefix} -> the branch created in Case 2 or Case 3.
 				ext := newExtensionNode(leaf.path[:lenCommonPrefix], branch)
 				*node = ext
 			} else {
-				// If, on the other hand, commonPrefix does not exist, we attach the branch directly onto
-				// the Trie.
+				// If, on the other hand, commonPrefix does not exist, we attach branch directly onto the
+				// Trie.
 				//
-				// Illustration:
+				// Illust.:
 				// ... -> the branch created in Case 2 or Case 3.
 				*node = branch
 			}
-
 			return
-		}
-
-		if branch, ok := (*node).(*BranchNode); ok {
-			if len(remainingNibbles) == 0 {
-				branch.setValue(value)
+		case *BranchNode:
+			branchNode := n
+			if len(remainingPath) == 0 {
+				// Arriving at this BranchNode exhausts remainingPath. Set the value as the BranchNode's value.
+				//
+				// Illust.:
+				// ... -> Branch {value}
+				branchNode.setValue(value)
 				return
+			} else {
+				// remainingPath is still not exhausted. Recurse into the branch corresponding to the first nibble
+				// of the remainingPath.
+				//
+				// Illust.:
+				// ... -> branchNode
+				//           ⤷ recurse
+				b, remaining := remainingPath[0], remainingPath[1:]
+				remainingPath = remaining
+				node = &branchNode.branches[b]
+				continue
 			}
-
-			b, remaining := remainingNibbles[0], remainingNibbles[1:]
-			remainingNibbles = remaining
-			node = &branch.branches[b]
-			continue
-		}
-
-		// E 01020304
-		// B 0 hello
-		// L 506 world
-		// + 010203 good
-		if ext, ok := (*node).(*ExtensionNode); ok {
-			matched := commonPrefixLength(ext.path, remainingNibbles)
-			if matched < len(ext.path) {
-				// E 01020304
-				// + 010203 good
-				extNibbles, branchNibble, extRemainingnibbles := ext.path[:matched], ext.path[matched], ext.path[matched+1:]
-				nodeBranchNibble, nodeLeafNibbles := remainingNibbles[matched], remainingNibbles[matched+1:]
+		case *ExtensionNode:
+			ext := n
+			lenCommonPrefix := commonPrefixLength(ext.path, remainingPath)
+			if len(ext.path) > lenCommonPrefix {
+				// Case 1: ext.path is a superstring of remainingPath. In other words, ext.path contains excess
+				// nibbles beyond remainingPath.
+				commonPrefix, firstExcessNibble, extExcessPath := ext.path[:lenCommonPrefix], ext.path[lenCommonPrefix], ext.path[lenCommonPrefix+1:]
+				nodeBranchNibble, nodeLeafNibbles := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
 				branch := newBranchNode()
-				if len(extRemainingnibbles) == 0 {
-					// E 0102030
-					// + 010203 good
-					branch.setBranch(branchNibble, ext.next)
+				if len(extExcessPath) == 0 {
+					// Case 1A: ext.path is a superstring of remainingPath with exactly one more excess nibble.
+					//
+					// Illust.:
+					//          ... -> branch
+					// firstExcessNibble ⤷ ext.next
+					branch.setBranch(firstExcessNibble, ext.next)
 				} else {
-					// E 01020304
-					// + 010203 good
-					newExt := newExtensionNode(extRemainingnibbles, ext.next)
-					branch.setBranch(branchNibble, newExt)
+					// Case 1B: ext.path is a superstring of remainingPath with more than one excess nibble.
+					//
+					// Illust.:
+					//           ... -> branch
+					// firstExcessNibble ⤷ ExtensionNode{extExcessPath, ext.next}
+					excessExt := newExtensionNode(extExcessPath, ext.next)
+					branch.setBranch(firstExcessNibble, excessExt)
 				}
 
 				remainingLeaf := newLeafNode(nodeLeafNibbles, value)
 				branch.setBranch(nodeBranchNibble, remainingLeaf)
 
-				// if there is no shared extension nibbles any more, then we don't need the extension node
-				// any more
-				// E 01020304
-				// + 1234 good
-				if len(extNibbles) == 0 {
-					*node = branch
+				if lenCommonPrefix > 0 {
+					// Regardless of whether Case 1A or Case 2B, if a commonPrefix exists, we place it in an
+					// ExtensionNode which sits before branch.
+					*node = newExtensionNode(commonPrefix, branch)
 				} else {
-					// otherwise create a new extension node
-					*node = newExtensionNode(extNibbles, branch)
+					// If, on the other hand, commonPrefix does not exist, we attach branch directly onto the
+					// the Trie.
+					*node = branch
 				}
 				return
+			} else {
+				// Case 2: ext.path is a substring of remainingPath.
+				remainingPath = remainingPath[lenCommonPrefix:]
+				node = &ext.next
+				continue
 			}
-
-			remainingNibbles = remainingNibbles[matched:]
-			node = &ext.next
-			continue
+		case *ProofNode:
+			if t.mode != MODE_VERIFY_FRAUD_PROOF {
+				panic("found a ProofNode in a Trie that is not in MODE_VERIFY_FRAUD_PROOF")
+			}
+			// TODO [Alice]
+			// proofNode := n
+		default:
+			panic("trie contains a node that cannot be deserialized into either a BranchNode, ExtensionNode, LeafNode, or ProofNode")
 		}
-
-		panic("trie contains a node that cannot be deserialized into either a BranchNode, ExtensionNode, LeafNode, or ProofNode")
 	}
 }
 
@@ -463,7 +480,7 @@ func (t *Trie) getNormally(key []byte) []byte {
 			continue
 		}
 
-		panic("not found")
+		return nil
 	}
 }
 
