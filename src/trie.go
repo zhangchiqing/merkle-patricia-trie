@@ -143,70 +143,83 @@ func (t *Trie) Put(key []byte, value []byte) {
 	}
 
 	// need to use pointer, so that I can update root in place without
-	// keeping trace of the parent node
+	// keeping track of the parent node
 	node := &t.root
-	nibbles := newNibbles(key)
+	remainingNibbles := newNibbles(key)
 	for {
 		if *node == nil {
-			leaf := newLeafNode(nibbles, value)
+			leaf := newLeafNode(remainingNibbles, value)
 			*node = leaf
 			return
 		}
 
 		if leaf, ok := (*node).(*LeafNode); ok {
-			matched := commonPrefixLength(leaf.path, nibbles)
+			lenCommonPrefix := commonPrefixLength(remainingNibbles, leaf.path)
 
-			// if all matched, update value even if the value are equal
-			if matched == len(nibbles) && matched == len(leaf.path) {
+			// Case 1: leaf.path == remainingNibbles.
+			//
+			// Illustration:
+			// ... -> Leaf {value}
+			if lenCommonPrefix == len(remainingNibbles) && lenCommonPrefix == len(leaf.path) {
 				newLeaf := newLeafNode(leaf.path, value)
 				*node = newLeaf
 				return
 			}
 
 			branch := newBranchNode()
-			// if matched some nibbles, check if matches either all remaining nibbles
-			// or all leaf nibbles
-			if matched == len(leaf.path) {
-				branch.setValue(leaf.value)
-			}
-
-			if matched == len(nibbles) {
+			if lenCommonPrefix == len(remainingNibbles) {
+				// Case 2: leaf.path is a superstring of remainingNibbles. In other words, leaf.path
+				// contains excess nibbles beyond remainingNibbles.
+				//
+				// Illustration:
+				// ... -> branch {value}
+				//           ⤷ Leaf {(leaf.path - commonPrefix)[1:], leaf.value}
 				branch.setValue(value)
+				branchNibble, leafNibbles := leaf.path[lenCommonPrefix], leaf.path[lenCommonPrefix+1:]
+				newLeaf := newLeafNode(leafNibbles, leaf.value)
+				branch.setBranch(branchNibble, newLeaf)
+			} else if lenCommonPrefix == len(leaf.path) {
+				// Case 3: remainingNibbles is a superstring of remainingNibbles. In other words,
+				// remainingNibbles contains excess nibbles beyond what leaf.path can 'satisfy'.
+				//
+				// Illustration:
+				// ... -> branch {leaf.value}
+				//          ⤷ Leaf {(remainingPath - commonPrefix)[1:], value}
+				branch.setValue(leaf.value)
+				branchNibble, leafNibbles := remainingNibbles[lenCommonPrefix], remainingNibbles[lenCommonPrefix+1:]
+				newLeaf := newLeafNode(leafNibbles, value)
+				branch.setBranch(branchNibble, newLeaf)
 			}
 
 			// if there is matched nibbles, an extension node will be created
-			if matched > 0 {
-				// create an extension node for the shared nibbles
-				ext := newExtensionNode(leaf.path[:matched], branch)
+			if lenCommonPrefix > 0 {
+				// Regardless of whether Case 2 or Case 3, if a commonPrefix exists, we place it in an
+				// ExtensionNode.
+				//
+				// Illustration:
+				// ... -> ExtensionNode {commonPrefix} -> the branch created in Case 2 or Case 3.
+				ext := newExtensionNode(leaf.path[:lenCommonPrefix], branch)
 				*node = ext
 			} else {
-				// when there no matched nibble, there is no need to keep the extension node
+				// If, on the other hand, commonPrefix does not exist, we attach the branch directly onto
+				// the Trie.
+				//
+				// Illustration:
+				// ... -> the branch created in Case 2 or Case 3.
 				*node = branch
-			}
-
-			if matched < len(leaf.path) {
-				branchNibble, leafNibbles := leaf.path[matched], leaf.path[matched+1:]
-				newLeaf := newLeafNode(leafNibbles, leaf.value) // not :matched+1
-				branch.setBranch(branchNibble, newLeaf)
-			}
-
-			if matched < len(nibbles) {
-				branchNibble, leafNibbles := nibbles[matched], nibbles[matched+1:]
-				newLeaf := newLeafNode(leafNibbles, value)
-				branch.setBranch(branchNibble, newLeaf)
 			}
 
 			return
 		}
 
 		if branch, ok := (*node).(*BranchNode); ok {
-			if len(nibbles) == 0 {
+			if len(remainingNibbles) == 0 {
 				branch.setValue(value)
 				return
 			}
 
-			b, remaining := nibbles[0], nibbles[1:]
-			nibbles = remaining
+			b, remaining := remainingNibbles[0], remainingNibbles[1:]
+			remainingNibbles = remaining
 			node = &branch.branches[b]
 			continue
 		}
@@ -216,12 +229,12 @@ func (t *Trie) Put(key []byte, value []byte) {
 		// L 506 world
 		// + 010203 good
 		if ext, ok := (*node).(*ExtensionNode); ok {
-			matched := commonPrefixLength(ext.path, nibbles)
+			matched := commonPrefixLength(ext.path, remainingNibbles)
 			if matched < len(ext.path) {
 				// E 01020304
 				// + 010203 good
 				extNibbles, branchNibble, extRemainingnibbles := ext.path[:matched], ext.path[matched], ext.path[matched+1:]
-				nodeBranchNibble, nodeLeafNibbles := nibbles[matched], nibbles[matched+1:]
+				nodeBranchNibble, nodeLeafNibbles := remainingNibbles[matched], remainingNibbles[matched+1:]
 				branch := newBranchNode()
 				if len(extRemainingnibbles) == 0 {
 					// E 0102030
@@ -250,12 +263,12 @@ func (t *Trie) Put(key []byte, value []byte) {
 				return
 			}
 
-			nibbles = nibbles[matched:]
+			remainingNibbles = remainingNibbles[matched:]
 			node = &ext.next
 			continue
 		}
 
-		panic("unknown type")
+		panic("trie contains a node that cannot be deserialized into either a BranchNode, ExtensionNode, LeafNode, or ProofNode")
 	}
 }
 
