@@ -79,6 +79,11 @@ func (b BranchNode) asSlots() Slots {
 			slots[i] = nilNodeRaw
 		} else {
 			node := b.branches[i]
+			if proofNode, ok := node.(*ProofNode); ok {
+				slots[i] = proofNode.hash()
+				continue
+			}
+
 			if len(serializeNode(node)) >= 32 {
 				slots[i] = node.hash()
 			} else {
@@ -131,7 +136,9 @@ func (e ExtensionNode) hash() []byte {
 func (e ExtensionNode) asSlots() Slots {
 	slots := make(Slots, 2)
 	slots[0] = nibblesAsBytes(appendPrefixToNibbles(e.path, false))
-	if len(serializeNode(e.next)) >= 32 {
+	if proofNode, ok := e.next.(ProofNode); ok {
+		slots[1] = proofNode.hash()
+	} else if len(e.next.serialized()) >= 32 {
 		slots[1] = e.next.hash()
 	} else {
 		slots[1] = e.next.asSlots()
@@ -183,11 +190,13 @@ func (l LeafNode) serialized() []byte {
 // ProofNodes are inserted into the Trie only using the PutProofNode method, therefore, ProofNodes only appear in Tries with
 // mode == MODE_VERIFY_FRAUD_PROOF.
 type ProofNode struct {
+	path  []Nibble
 	_hash []byte
 }
 
-func newProofNode(hash []byte) *ProofNode {
+func newProofNode(path []Nibble, hash []byte) *ProofNode {
 	return &ProofNode{
+		path:  path,
 		_hash: hash,
 	}
 }
@@ -196,18 +205,12 @@ func (p ProofNode) hash() []byte {
 	return p._hash
 }
 
-// asSlots returns ProofNode's slots representation. The selection of a byte with value 16 for the first slot "magicSlot"
-// is deliberate: because the byte 16 will never appear in the slots representation of any other kind of node, this allows us
-// to perfectly disambiguate between a serialized ProofNode and a serialization of any other kind of node.
 func (p ProofNode) asSlots() Slots {
-	var magicSlot byte = 16
-	slots := Slots{magicSlot, p.hash}
-
-	return slots
+	panic("at no point in the MPT lifecycle does ProofNode need to be represented as slots")
 }
 
 func (p ProofNode) serialized() []byte {
-	return serializeNode(p)
+	panic("at no point in the MPT lifecycle does ProofNode need to be serialized")
 }
 
 ////////////////////////////////

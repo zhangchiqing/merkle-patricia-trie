@@ -1,6 +1,9 @@
 package mpt
 
-import "reflect"
+import (
+	"fmt"
+	"reflect"
+)
 
 // Trie is an in-memory representation of a Merkle Patricia Trie using RLP-encoding.
 // Trie supports loading data from, and saving data to, persistent storage using the
@@ -67,7 +70,10 @@ type KVPair struct {
 type PreState []interface{}
 
 // PostState is an array of ProofNodes.
-type PostState []ProofNode
+type PostState []struct {
+	path []Nibble
+	hash []byte
+}
 
 // NewTrie returns an empty Trie in the specified, immutable mode.
 func NewTrie(mode TrieMode) *Trie {
@@ -142,8 +148,6 @@ func (t *Trie) Put(key []byte, value []byte) {
 		panic("")
 	}
 
-	// need to use pointer, so that I can update root in place without
-	// keeping track of the parent node
 	node := &t.root
 	remainingPath := newNibbles(key)
 	for {
@@ -181,7 +185,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 				newLeaf := newLeafNode(leafNibbles, leaf.value)
 				branch.setBranch(branchNibble, newLeaf)
 			} else if lenCommonPrefix == len(leaf.path) {
-				// Case 3: remainingPath is a superstring of remainingPath. In other words,
+				// Case 3: remainingPath is a superstring of leaf.path. In other words,
 				// remainingPath contains excess nibbles beyond what leaf.path can 'satisfy'.
 				//
 				// Illust.:
@@ -191,15 +195,15 @@ func (t *Trie) Put(key []byte, value []byte) {
 				branchNibble, leafNibbles := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
 				newLeaf := newLeafNode(leafNibbles, value)
 				branch.setBranch(branchNibble, newLeaf)
+			} else {
+				// TODO [Alice]
 			}
 
-			// if there is matched nibbles, an extension node will be created
 			if lenCommonPrefix > 0 {
-				// Regardless of whether Case 2 or Case 3, if a commonPrefix exists, we place it in an
-				// ExtensionNode which sits before branch.
+				// If a commonPrefix exists, we place it in an ExtensionNode which sits before branch.
 				//
 				// Illust.:
-				// ... -> ExtensionNode {commonPrefix} -> the branch created in Case 2 or Case 3.
+				// ... -> ExtensionNode {commonPrefix} -> branch
 				ext := newExtensionNode(leaf.path[:lenCommonPrefix], branch)
 				*node = ext
 			} else {
@@ -207,8 +211,20 @@ func (t *Trie) Put(key []byte, value []byte) {
 				// Trie.
 				//
 				// Illust.:
-				// ... -> the branch created in Case 2 or Case 3.
+				// ... -> branch
 				*node = branch
+			}
+
+			if lenCommonPrefix < len(leaf.path) {
+				branchNibble, leafNibbles := leaf.path[lenCommonPrefix], leaf.path[lenCommonPrefix+1:]
+				newLeaf := newLeafNode(leafNibbles, leaf.value)
+				branch.setBranch(branchNibble, newLeaf)
+			}
+
+			if lenCommonPrefix < len(remainingPath) {
+				branchNibble, leafNibbles := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
+				newLeaf := newLeafNode(leafNibbles, value)
+				branch.setBranch(branchNibble, newLeaf)
 			}
 			return
 		case *BranchNode:
@@ -262,7 +278,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 				branch.setBranch(nodeBranchNibble, remainingLeaf)
 
 				if lenCommonPrefix > 0 {
-					// Regardless of whether Case 1A or Case 2B, if a commonPrefix exists, we place it in an
+					// Regardless of whether Case 1A or Case 1B, if a commonPrefix exists, we place it in an
 					// ExtensionNode which sits before branch.
 					*node = newExtensionNode(commonPrefix, branch)
 				} else {
@@ -484,8 +500,200 @@ func (t *Trie) getNormally(key []byte) []byte {
 	}
 }
 
-func (t *Trie) putProofNode(path []Nibble, proofNode ProofNode) {
-	// TODO [Alice]
+// putProofNode places
+func (t *Trie) putProofNode(completePath []Nibble, hash []byte) error {
+	if t.mode != MODE_VERIFY_FRAUD_PROOF {
+		panic("")
+	}
+
+	node := &t.root
+	remainingPath := completePath
+	for {
+		if *node == nil {
+			*node = newProofNode(remainingPath, hash)
+			return nil
+		}
+
+		switch n := (*node).(type) {
+		case *LeafNode:
+			leaf := n
+			lenCommonPrefix := commonPrefixLength(remainingPath, leaf.path)
+
+			// Case 1: leaf.path == remainingPath. This case is unreachable if PreState is
+			// valid (read: isPreStateValid). If this case is reached when putProofNode is used
+			// as a subroutine of LoadPostState, then PostState is invalid.
+			//
+			// Illust.:
+			// "... -> Leaf" cannot be changed to "... -> ProofNode"
+			if lenCommonPrefix == len(remainingPath) && lenCommonPrefix == len(leaf.path) {
+				return fmt.Errorf("proofNode overwrites existing LeafNode")
+			}
+
+			branch := newBranchNode()
+			if lenCommonPrefix == len(remainingPath) {
+				// Case 2: leaf.path is a superstring of remainingPath. In other words, leaf.path
+				// contains excess nibbles beyond remainingPath.
+				//
+				// This case cannot be entered in LoadPreState and LoadPostState.
+				// Informal argument: the node that was in this position in the complete PreState
+				// trie was a BranchNode that is an ancestor of a KVPair included in PreState. This
+				// BranchNode should not be included in PreState as a ProofNode, its direct children
+				// and its value should.
+				return fmt.Errorf("proofNode corresponds to a BranchNode that is an ancestor of a KVPair included in PreState")
+			} else if lenCommonPrefix == len(leaf.path) {
+				// Case 3: remainingPath is a superstring of leaf.path. In other words,
+				// remainingPath contains excess nibbles beyond what leaf.path can 'satisfy'.
+				//
+				// Illust.:
+				//                 ... -> branch {leaf.value}
+				//      proofNodeExcessNibbles ⤷ ProofNode { proofNodeExcessNibbles, value }
+				branch.setValue(leaf.value)
+				firstProofNodeExcessNibble, proofNodeExcessPath := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
+				branch.setBranch(firstProofNodeExcessNibble, newProofNode(proofNodeExcessPath, hash))
+			}
+
+			if lenCommonPrefix > 0 {
+				// If a commonPrefix exists, we place it in an ExtensionNode which sits before
+				// branch.
+				//
+				// Illust.:
+				// ... -> ExtensionNode {commonPrefix} -> the branch created in Case 3.
+				*node = newExtensionNode(leaf.path[:lenCommonPrefix], branch)
+			} else {
+				// If, on the other hand, commonPrefix does not exist, we attach branch directly onto
+				// the Trie.
+				//
+				// Ilust.:
+				// ... -> the branch created in Case 3.
+				*node = branch
+			}
+
+			if lenCommonPrefix < len(leaf.path) {
+				branchNibble, leafNibbles := leaf.path[lenCommonPrefix], leaf.path[lenCommonPrefix+1:]
+				newLeaf := newLeafNode(leafNibbles, leaf.value)
+				branch.setBranch(branchNibble, newLeaf)
+			}
+
+			if lenCommonPrefix < len(remainingPath) {
+				branchNibble, proofNodeNibbles := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
+				proofNode := newProofNode(proofNodeNibbles, hash)
+				branch.setBranch(branchNibble, proofNode)
+			}
+			return nil
+		case *BranchNode:
+			branchNode := n
+			if len(remainingPath) == 0 {
+				// Arriving at this BranchNode exhausts remainingPath. This case is unreachable if
+				// PreState was created using GetPreStateAndPostState.
+				return fmt.Errorf("proofNode overwrites existing BranchNode")
+			} else {
+				// remainingPath is still not exhausted. Recurse into the branch corresponding to
+				// the first nibble of the remainingPath.
+				// Illust.:
+				// ... -> branchNode
+				//           ⤷ recurse
+				b, remaining := remainingPath[0], remainingPath[1:]
+				remainingPath = remaining
+				node = &branchNode.branches[b]
+				continue
+			}
+		case *ExtensionNode:
+			ext := n
+			lenCommonPrefix := commonPrefixLength(ext.path, remainingPath)
+			if len(ext.path) > lenCommonPrefix {
+				// Case 1: ext.path is a superstring of remainingPath. In other words, ext.path
+				// contains excess nibbles beyond remainingPath.
+				commonPrefix, firstExcessNibble, extExcessPath := ext.path[:lenCommonPrefix], ext.path[lenCommonPrefix], ext.path[lenCommonPrefix+1:]
+				firstProofNodeExcessNibble, proofNodeExcessPath := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
+				branch := newBranchNode()
+				if len(extExcessPath) == 0 {
+					// Case 1A: ext.path is a superstring of remainingPath with exactly one excess
+					// nibble.
+					//
+					// Illust.:
+					//          ... -> branch
+					// firstExcessNibble ⤷ ext.next
+					branch.setBranch(firstExcessNibble, ext.next)
+				} else {
+					// Case 1B: ext.path is a superstring of remainingPath with more than one excess
+					// nibble.
+					//
+					// Illust.:
+					//           ... -> branch
+					// firstExcessNibble ⤷ ExtensionNode{extExcessPath, ext.next}
+					excessExt := newExtensionNode(extExcessPath, ext.next)
+					branch.setBranch(firstExcessNibble, excessExt)
+				}
+
+				proofNode := newProofNode(proofNodeExcessPath, hash)
+				branch.setBranch(firstProofNodeExcessNibble, proofNode)
+
+				if lenCommonPrefix > 0 {
+					// Regardless of whether Case 1A or Case 1B, if a commonPrefix exists, we place it
+					// in an ExtensionNode which sits before branch.
+					*node = newExtensionNode(commonPrefix, branch)
+				} else {
+					// If, on the other hand, commonPrefix does not exist, we attach branch directly
+					// onto the Trie.
+					*node = branch
+				}
+				return nil
+			} else {
+				// Case 2: ext.path is a substring of remainingPath
+				remainingPath = remainingPath[lenCommonPrefix:]
+				node = &ext.next
+				continue
+			}
+		case *ProofNode:
+			proofNode := n
+			lenCommonPrefix := commonPrefixLength(remainingPath, proofNode.path)
+
+			// Case 1: proofNode.path == remainingPath. This case is unreachable if PreState
+			// is valid (read: isPreStateValid). If this case is reached when putProofNode is
+			// used as a subroutine of LoadPostState, then PostState is invalid (redundant
+			// ProofNode).
+			if lenCommonPrefix == len(remainingPath) && lenCommonPrefix == len(proofNode.path) {
+				return fmt.Errorf("proofNode overwrites existing ProofNode")
+			}
+
+			branch := newBranchNode()
+			if lenCommonPrefix == len(remainingPath) {
+				// Case 2: proofNode.path is a superstring of remainingPath. In other words,
+				// proofNode.path contains excess nibbles beyond remainingPath.
+				//
+				// This case cannot be entered in LoadPreState and LoadPostState.
+				// Informal argument: remainingPath should not be fully consumed at this point.
+				return fmt.Errorf("TODO [Alice] remainingPath should not be fully consumed at this point")
+			} else if lenCommonPrefix == len(proofNode.path) {
+				// Case 3: remainingPath is a superstring of leaf.path. In other words,
+				// remainingPath contains excess nibbles beyond what leaf.path can 'satisfy'.
+				return fmt.Errorf("TODO [Alice]")
+			}
+
+			if lenCommonPrefix > 0 {
+				// TODO [Alice]
+				*node = newExtensionNode(proofNode.path[:lenCommonPrefix], branch)
+			} else {
+				// TODO [Alice]
+				*node = branch
+			}
+
+			if lenCommonPrefix < len(proofNode.path) {
+				branchNibble, proofNodeNibbles := proofNode.path[lenCommonPrefix], proofNode.path[lenCommonPrefix+1:]
+				proofNode := newProofNode(proofNodeNibbles, proofNode.hash())
+				branch.setBranch(branchNibble, proofNode)
+			}
+
+			if lenCommonPrefix < len(remainingPath) {
+				branchNibble, proofNodeNibbles := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
+				proofNode := newProofNode(proofNodeNibbles, hash)
+				branch.setBranch(branchNibble, proofNode)
+			}
+			return nil
+		default:
+			panic("trie contains a node that cannot be deserialized into either a BranchNode, ExtensionNode, LeafNode, or ProofNode")
+		}
+	}
 }
 
 func minimizePreState(preState PreState) PreState {
@@ -498,15 +706,15 @@ func minimizePostState(postState PostState) PostState {
 	panic("")
 }
 
-// validatePreState returns whether preState meets two simple validity conditions:
+// isPreStateValid returns whether preState meets two simple validity conditions:
 // 1. Its elements are either KVPair, or ProofNode.
 // 2. ProofNode elements appear before KVPair elements. LoadPreState ranges through preState
 //    from front to rear, iteratively building up the mode == MODE_VERIFY_FRAUD_PROOF trie.
 //    this second validity condition ensures that during this process, ProofNodes do not
 //    overwrite already-inserted KVPairs.
 //
-// PreState pre-processed by minimizePreState are guaranteed to pass this validatePreState.
-func validatePreState(preState PreState) bool {
+// PreState pre-processed by minimizePreState are guaranteed to pass this isPreStateValid.
+func isPreStateValid(preState PreState) bool {
 	// TODO [Alice]
 	panic("")
 }

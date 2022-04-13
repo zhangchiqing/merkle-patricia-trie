@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/require"
 )
 
@@ -209,4 +210,40 @@ func TestGenerateFromDB(t *testing.T) {
 	require.Equal(t, trie.root.hash(), newTrie.root.hash())
 
 	require.True(t, reflect.DeepEqual(trie, newTrie))
+}
+
+func TestPutProofNode(t *testing.T) {
+	t.Run("Trie with one LeafNode", func(t *testing.T) {
+		trie := NewTrie(MODE_NORMAL)
+		trie.Put([]byte{0}, []byte("cutealice"))
+
+		trie2 := NewTrie(MODE_VERIFY_FRAUD_PROOF)
+		nibbles := newNibbles([]byte{0})
+		leafNode := newLeafNode(nibbles, []byte("cutealice"))
+		err := trie2.putProofNode([]Nibble{}, leafNode.hash())
+		require.NoError(t, err)
+
+		require.Equal(t, trie.RootHash(), trie2.RootHash())
+	})
+
+	t.Run("Trie with two LeafNodes emanating from one BranchNode", func(t *testing.T) {
+		trie := NewTrie(MODE_NORMAL)
+		trie.Put([]byte{0, 1}, []byte("⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷"))
+		trie.Put([]byte{0, 2}, []byte("⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷a⤷⤷"))
+
+		trie2 := NewTrie(MODE_VERIFY_FRAUD_PROOF)
+		leafNode1 := newLeafNode([]Nibble{}, []byte("⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷"))
+		leafNode2 := newLeafNode([]Nibble{}, []byte("⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷a⤷⤷"))
+		err := trie2.putProofNode(newNibbles([]byte{0, 1}), leafNode1.hash())
+		require.NoError(t, err)
+		err = trie2.putProofNode(newNibbles([]byte{0, 2}), leafNode2.hash())
+		require.NoError(t, err)
+
+		_hash, _ := rlp.EncodeToBytes(trie.root.(*ExtensionNode).next.(*BranchNode).asSlots())
+		fmt.Printf("%v\n", _hash)
+		_hash2, _ := rlp.EncodeToBytes(trie2.root.(*ExtensionNode).next.(*BranchNode).asSlots())
+		fmt.Printf("%v\n", _hash2)
+
+		require.Equal(t, trie.RootHash(), trie2.RootHash())
+	})
 }
