@@ -487,3 +487,26 @@ func (t *Trie) getNormally(key []byte) []byte {
 func (t *Trie) putProofNode(path []Nibble, proofNode ProofNode) {
 	// TODO [Alice]
 }
+
+func minimizePreState(preState PreState) PreState {
+	// TODO [Alice]
+	panic("")
+}
+
+func minimizePostState(postState PostState) PostState {
+	// TODO [Alice]
+	panic("")
+}
+
+// validatePreState returns whether preState meets two simple validity conditions:
+// 1. Its elements are either KVPair, or ProofNode.
+// 2. ProofNode elements appear before KVPair elements. LoadPreState ranges through preState
+//    from front to rear, iteratively building up the mode == MODE_VERIFY_FRAUD_PROOF trie.
+//    this second validity condition ensures that during this process, ProofNodes do not
+//    overwrite already-inserted KVPairs.
+//
+// PreState pre-processed by minimizePreState are guaranteed to pass this validatePreState.
+func validatePreState(preState PreState) bool {
+	// TODO [Alice]
+	panic("")
+}
