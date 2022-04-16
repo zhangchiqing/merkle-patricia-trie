@@ -19,8 +19,8 @@ import (
 //    Op 1. NewTrie(mode: MODE_NORMAL)
 //    Op 2. LoadFromDB()
 //    Op 3. *Get()/Put()
-//    Op 4. state_root = GetStateRoot()
-//    Op 5. if state_root == expected_state_root
+//    Op 4. stateRoot = GetStateRoot()
+//    Op 5. if stateRoot == publishedStateRoot
 //            then SaveToDB()
 //            else go to 'Generate fraud proof mode'
 //
@@ -28,19 +28,20 @@ import (
 //    Op 1. NewTrie(mode: MODE_GENERATE_FRAUD_PROOF)
 //    Op 2. LoadFromDB()
 //    Op 3. *Get()/Put()
-//    Op 4. pre_state, pseudo_post_state = GetPreAndPseudoPostState()
+//    Op 4. preState, postState = GetPreAndPostState()
+//    Op 5. serializedPreState, serializedPostState = preState.Serialize(), postState.Serialize()
 //
 // 3. Execute fraud proof mode:
 //    Op 1. NewTrie(mode: VERIFY_FRAUD_PROOF)
-//    Op 2. LoadPreState(pre_state)
-//    Op 3. *Get/Put()
-//    Op 4. if WasPreStateComplete() then continue else exit
-//    Op 5. LoadPseudoPostState(pseudo_post_state)
-//    Op 6. state_root = GetStateRoot()
-//    Op 7. if state_root == published_state_root
+//    Op 2. preState, postState = DeserializePreState(serializedPreState),
+//                                                       DeserializePostState(serializedPostState)
+//    Op 3. LoadPreStateAndPostState(preState, postState)
+//    Op 4. *Get/Put()
+//    Op 5. if WasPreStateComplete() then continue else exit
+//    Op 6. stateRoot = GetStateRoot()
+//    Op 7. if stateRoot == publishedStateRoot
 //          then do nothing
 //          else disable the rollup
-//
 type Trie struct {
 	root Node
 	mode TrieMode
@@ -75,7 +76,8 @@ type PostState []struct {
 	hash []byte
 }
 
-// NewTrie returns an empty Trie in the specified, immutable mode.
+// NewTrie returns an empty Trie in the specified mode. A Trie, once constructed, cannot have its
+// mode explicitly changed.
 func NewTrie(mode TrieMode) *Trie {
 	if mode != MODE_NORMAL && mode != MODE_GENERATE_FRAUD_PROOF && mode != MODE_VERIFY_FRAUD_PROOF {
 		panic("attempted to create a new trie with an invalid mode.")
@@ -173,28 +175,46 @@ func (t *Trie) Put(key []byte, value []byte) {
 			}
 
 			branch := newBranchNode()
-			if lenCommonPrefix == len(remainingPath) {
-				// Case 2: leaf.path is a superstring of remainingPath. In other words, leaf.path
-				// contains excess nibbles beyond remainingPath.
+			if len(remainingPath) == lenCommonPrefix {
+				// Case 2: leaf.path is a superstring of remainingPath.
 				//
 				// Illust.:
 				// ... -> branch {value}
-				//           ⤷ Leaf {(leaf.path - commonPrefix)[1:], leaf.value}
 				branch.setValue(value)
-				branchNibble, leafNibbles := leaf.path[lenCommonPrefix], leaf.path[lenCommonPrefix+1:]
-				newLeaf := newLeafNode(leafNibbles, leaf.value)
-				branch.setBranch(branchNibble, newLeaf)
-			} else if lenCommonPrefix == len(leaf.path) {
-				// Case 3: remainingPath is a superstring of leaf.path. In other words,
-				// remainingPath contains excess nibbles beyond what leaf.path can 'satisfy'.
+			} else if len(leaf.path) == lenCommonPrefix {
+				// Case 3: remainingPath is a superstring of leaf.path.
 				//
 				// Illust.:
 				// ... -> branch {leaf.value}
-				//          ⤷ Leaf {(remainingPath - commonPrefix)[1:], value}
 				branch.setValue(leaf.value)
-				branchNibble, leafNibbles := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
-				newLeaf := newLeafNode(leafNibbles, value)
-				branch.setBranch(branchNibble, newLeaf)
+			}
+			// ↓ This commented out conditional branch is deliberately left here for exhaustiveness and clarity. ↓
+			// else {
+			// 	   Case 4: leaf.path is not a superstring of remainingPath, nor vice versa.
+			//
+			// 	   In this case, there is no need to set a value on branch; both values will sit on new leaves.
+			// }
+
+			if len(leaf.path) > lenCommonPrefix {
+				// If leaf.path is longer than commonPrefix, then we create a new leaf to hold leaf.value.
+				//
+				// Illust.:
+				// ... -> branch
+				//           ⤷ Leaf {leaf.value}
+				firstLeafNibble, leafPath := leaf.path[lenCommonPrefix], leaf.path[lenCommonPrefix+1:]
+				newLeaf := newLeafNode(leafPath, leaf.value)
+				branch.setBranch(firstLeafNibble, newLeaf)
+			}
+
+			if len(remainingPath) > lenCommonPrefix {
+				// If remainingPath is longer than commonPrefix, then we create a new leaf to hold value.
+				//
+				// Illust.:
+				// ... -> branch
+				//           ⤷ Leaf {leaf.value}
+				firstLeafNibble, leafPath := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
+				newLeaf := newLeafNode(leafPath, value)
+				branch.setBranch(firstLeafNibble, newLeaf)
 			}
 
 			if lenCommonPrefix > 0 {
@@ -213,17 +233,6 @@ func (t *Trie) Put(key []byte, value []byte) {
 				*node = branch
 			}
 
-			if lenCommonPrefix < len(leaf.path) {
-				branchNibble, leafNibbles := leaf.path[lenCommonPrefix], leaf.path[lenCommonPrefix+1:]
-				newLeaf := newLeafNode(leafNibbles, leaf.value)
-				branch.setBranch(branchNibble, newLeaf)
-			}
-
-			if lenCommonPrefix < len(remainingPath) {
-				branchNibble, leafNibbles := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
-				newLeaf := newLeafNode(leafNibbles, value)
-				branch.setBranch(branchNibble, newLeaf)
-			}
 			return
 		case *BranchNode:
 			branchNode := n
@@ -295,15 +304,55 @@ func (t *Trie) Put(key []byte, value []byte) {
 			if t.mode != MODE_VERIFY_FRAUD_PROOF {
 				panic("found a ProofNode in a Trie that is not in MODE_VERIFY_FRAUD_PROOF")
 			}
-			// TODO [Alice]
-			// proofNode := n
+
+			proofNode := n
+			lenCommonPrefix := commonPrefixLength(remainingPath, proofNode.path)
+
+			// The cases here largely correspond to the cases in the '*LeafNode' arm, so comments are omitted for
+			// brevity.
+
+			// TODO [Alice]: this case can be further constrained to shrink PreState.
+			if len(remainingPath) == lenCommonPrefix && len(proofNode.path) == len(remainingPath) {
+				newLeaf := newLeafNode(proofNode.path, value)
+				*node = newLeaf
+				return
+			}
+
+			branch := newBranchNode()
+			if len(remainingPath) == lenCommonPrefix {
+				branch.setValue(value)
+			} else if len(proofNode.path) == lenCommonPrefix {
+				// SAFETY: this case is precluded by the illegal cases in putProofNode.
+				panic("unreachable code")
+			}
+
+			if len(proofNode.path) > lenCommonPrefix {
+				firstProofNodeNibble, proofNodePath := proofNode.path[lenCommonPrefix], proofNode.path[lenCommonPrefix+1:]
+				newProofNode := newProofNode(proofNodePath, proofNode.hash())
+				branch.setBranch(firstProofNodeNibble, newProofNode)
+			}
+
+			if len(remainingPath) > lenCommonPrefix {
+				firstLeafNibble, leafPath := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
+				newLeaf := newLeafNode(leafPath, value)
+				branch.setBranch(firstLeafNibble, newLeaf)
+			}
+
+			if lenCommonPrefix > 0 {
+				ext := newExtensionNode(proofNode.path[:lenCommonPrefix], branch)
+				*node = ext
+			} else {
+				*node = branch
+			}
+
+			return
 		default:
 			panic("trie contains a node that cannot be deserialized into either a BranchNode, ExtensionNode, LeafNode, or ProofNode")
 		}
 	}
 }
 
-/// RootHash returns the root hash of the Trie.
+// RootHash returns the root hash of the Trie.
 func (t *Trie) RootHash() []byte {
 	if t.root == nil {
 		return nilNodeHash
@@ -312,7 +361,7 @@ func (t *Trie) RootHash() []byte {
 	return t.root.hash()
 }
 
-// GetPreAndPseudoPostState returns PreState: the list of key-value pairs that have to be loaded into
+// GetPreAndPostState returns PreState: the list of key-value pairs that have to be loaded into
 // a Trie (using `LoadPreState`) to serve reads into world state during fraud proof execution, and
 // PseudoPostState: the list of PseudoNodes that have to be loaded into a Trie (using `LoadPostState`)
 // to calculate its post state root after fraud proof execution.
@@ -320,8 +369,8 @@ func (t *Trie) RootHash() []byte {
 // After calling this method, the Trie becomes dead.
 //
 // # Panics
-// This method panics if called when t.mode != MODE_GENERATE_FRAUD_PROOF.
-func (t *Trie) GetPreAndPseudoPostState() (PreState, PostState) {
+// Panics if called when t.mode != MODE_GENERATE_FRAUD_PROOF.
+func (t *Trie) GetPreAndPostState() (PreState, PostState) {
 	if t.mode != MODE_GENERATE_FRAUD_PROOF {
 		panic("attempted to GetPreAndPseudoPostState, but Trie is not in generate fraud proof mode.")
 	}
@@ -339,12 +388,34 @@ func (t *Trie) GetPreAndPseudoPostState() (PreState, PostState) {
 	return preState, post_state
 }
 
-/// LoadFromDB populates the Trie with data from db. It returns an error if db
-/// does not contain the key "root".
+/// LoadPreAndPostState prepares a Trie to be used in MODE_VERIFY_FRAUD_PROOF.
 ///
 /// # Panics
-/// 1. panics if called when t.mode != MODE_NORMAL.
-/// 2. panics if Trie does not contain hard-coded key "root".
+///Panics if called when t.mode != MODE_VERIFY_FRAUD_PROOF.
+func (t *Trie) LoadPreAndPostState(preState PreState, postState PostState) {
+	if t.mode != MODE_VERIFY_FRAUD_PROOF {
+		panic("")
+	}
+
+	for _, kvPairOrProofNode := range preState {
+		switch v := kvPairOrProofNode.(type) {
+		case ProofNode:
+			// TODO [Alice]
+			panic("")
+		case KVPair:
+			t.Put(v.key, v.value)
+		default:
+			panic("unreachable code")
+		}
+	}
+}
+
+// LoadFromDB populates the Trie with data from db. It returns an error if db
+// does not contain the key "root".
+//
+// # Panics
+// 1. panics if called when t.mode != MODE_NORMAL.
+// 2. panics if DB does not contain hard-coded key "root".
 func (t *Trie) LoadFromDB(db DB) error {
 	if t.mode != MODE_NORMAL {
 		panic("")
@@ -366,41 +437,8 @@ func (t *Trie) LoadFromDB(db DB) error {
 	return nil
 }
 
-/// LoadPreState populates the Trie with data from pre_state.
-///
-/// # Panics
-/// This method panics if called when t.mode != MODE_VERIFY_FRAUD_PROOF
-func (t *Trie) LoadPreState(preState PreState) {
-	if t.mode != MODE_VERIFY_FRAUD_PROOF {
-		panic("")
-	}
-
-	for _, kvPairOrProofNode := range preState {
-		switch v := kvPairOrProofNode.(type) {
-		case ProofNode:
-			// TODO [Alice]
-			panic("")
-		case KVPair:
-			t.Put(v.key, v.value)
-		default:
-			panic("unreachable code")
-		}
-	}
-}
-
-/// LoadPseudoPostState 'completes' an already populated Trie with PseudoNodes from pseudo_post_state.
-///
-/// # Panics
-/// This method panics if called when t.mode != MODE_VERIFY_FRAUD_PROOF
-func (t *Trie) LoadPseudoPostState(pseudo_post_state PostState) {
-	if t.mode != MODE_VERIFY_FRAUD_PROOF {
-		panic("")
-	}
-	// TODO [Alice]
-}
-
-/// SaveToDB saves the Trie into db. At the end of this operation, the root of
-/// the Trie is stored in key "root".
+// SaveToDB saves the Trie into db. At the end of this operation, the root of
+// the Trie is stored in key "root".
 func (t *Trie) SaveToDB(db DB) {
 	nodes := []Node{t.root}
 	currentNode := (Node)(nil)
@@ -445,10 +483,10 @@ func (t *Trie) SaveToDB(db DB) {
 	db.Put([]byte("root"), serializeNode(t.root))
 }
 
-/// WasPreStateComplete returns whether PreState was complete during fraud proof transaction execution.
-///
-/// # Panics
-/// This method panics if called when t.mode != MODE_VERIFY_FRAUD_PROOF
+// WasPreStateComplete returns whether PreState was complete during fraud proof transaction execution.
+//
+// # Panics
+// This method panics if called when t.mode != MODE_VERIFY_FRAUD_PROOF
 func (t *Trie) WasPreStateComplete() bool {
 	if t.mode != MODE_VERIFY_FRAUD_PROOF {
 		panic("")
@@ -504,7 +542,20 @@ func (t *Trie) getNormally(key []byte) []byte {
 	}
 }
 
-// putProofNode places
+// putProofNode places hash into the Trie at completePath as a ProofNode.
+//
+// # Errors
+// putProofNode returns an error if adding (completePath, hash) to the Trie is an 'Illegal' operation. Illegal
+// operations can be defined by construction: a Verifier that calls the GetPreAndPostState method defined in this
+// library should never receive a PreState or a PostState that contains an illegal operation. The comments in
+// this function describes all possible illegal operations.
+//
+// TODO [Alice]: come up with a more insightful definition of Illegal operation.
+//
+// # Panics
+// 1. Panics if mode != MODE_VERIFY_FRAUD_PROOF
+// 2. Panics if the Trie contains a node that cannot be deserialized into either a LeafNode, BranchNode, ExtensionNode,
+//    or ProofNode.
 func (t *Trie) putProofNode(completePath []Nibble, hash []byte) error {
 	if t.mode != MODE_VERIFY_FRAUD_PROOF {
 		panic("")
@@ -523,37 +574,62 @@ func (t *Trie) putProofNode(completePath []Nibble, hash []byte) error {
 			leaf := n
 			lenCommonPrefix := commonPrefixLength(remainingPath, leaf.path)
 
-			// Case 1: leaf.path == remainingPath. This case is unreachable if PreState is
-			// valid (read: isPreStateValid). If this case is reached when putProofNode is used
-			// as a subroutine of LoadPostState, then PostState is invalid.
-			//
-			// Illust.:
-			// "... -> Leaf" cannot be changed to "... -> ProofNode"
 			if lenCommonPrefix == len(remainingPath) && lenCommonPrefix == len(leaf.path) {
-				return fmt.Errorf("proofNode overwrites existing LeafNode")
+				// Illegal case L1:
+				// ProofNode overwrites existing LeafNode.
+				return fmt.Errorf("illegal case L1: read the source of putProofNode")
 			}
 
 			branch := newBranchNode()
-			if lenCommonPrefix == len(remainingPath) {
-				// Case 2: leaf.path is a superstring of remainingPath. In other words, leaf.path
-				// contains excess nibbles beyond remainingPath.
+			if len(remainingPath) == lenCommonPrefix {
+				// Illegal case L2:
+				// This conditional block is entered when the value of a BranchNode needs to
+				// be proven. Because this library does not define a `ProofBranchNode`, values
+				// of branch nodes that need to be proven must be included whole in PreState.
 				//
-				// This case cannot be entered in LoadPreState and LoadPostState.
-				// Informal argument: the node that was in this position in the complete PreState
-				// trie was a BranchNode that is an ancestor of a KVPair included in PreState. This
-				// BranchNode should not be included in PreState as a ProofNode, its direct children
-				// and its value should.
-				return fmt.Errorf("proofNode corresponds to a BranchNode that is an ancestor of a KVPair included in PreState")
-			} else if lenCommonPrefix == len(leaf.path) {
-				// Case 3: remainingPath is a superstring of leaf.path. In other words,
-				// remainingPath contains excess nibbles beyond what leaf.path can 'satisfy'.
+				// This is a limitation of this library that ought to be rectified in future
+				// releases (TODO [Alice]).
+				return fmt.Errorf("illegal case L2: read the source of putProofNode")
+			} else if len(leaf.path) == lenCommonPrefix {
+				// Legal case 1:
+				// remainingPath is a superstring of leaf.path.
 				//
 				// Illust.:
 				//                 ... -> branch {leaf.value}
-				//      proofNodeExcessNibbles ⤷ ProofNode { proofNodeExcessNibbles, value }
 				branch.setValue(leaf.value)
-				firstProofNodeExcessNibble, proofNodeExcessPath := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
-				branch.setBranch(firstProofNodeExcessNibble, newProofNode(proofNodeExcessPath, hash))
+			}
+			// ↓ This commented out conditional branch is deliberately left here for exhaustiveness and clarity. ↓
+			// else {
+			// 	   Legal case 2: leaf.path is not a superstring of remainingPath, nor vice versa.
+			//
+			// 	   In this case, there is no need to set a value on branch; leaf.value will sit on a new leaf.
+			// }
+
+			if len(leaf.path) > lenCommonPrefix {
+				// If leaf.path is longer than commonPrefix, then we create a new leaf to hold leaf.value.
+				//
+				// Illust.:
+				// ... -> branch
+				//           ⤷ Leaf {leaf.value}
+				branchNibble, leafPath := leaf.path[lenCommonPrefix], leaf.path[lenCommonPrefix+1:]
+				newLeaf := newLeafNode(leafPath, leaf.value)
+				branch.setBranch(branchNibble, newLeaf)
+			}
+
+			if len(remainingPath) > lenCommonPrefix {
+				// If remainingPath is longer than commonPrefix, then we create a new proof node. This conditional
+				// block must be entered.
+				//
+				// Illust.:
+				// ... -> branch
+				//           ⤷ ProofNode {leaf.value}
+				branchNibble, proofNodePath := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
+				proofNode := newProofNode(proofNodePath, hash)
+				branch.setBranch(branchNibble, proofNode)
+			} else {
+				// Illegal case L3: len(remainingPath) < lenCommonPrefix
+				// No ProofNode is created by putProofNode.
+				return fmt.Errorf("illegal case L3: read the source of putProofNode")
 			}
 
 			if lenCommonPrefix > 0 {
@@ -561,35 +637,24 @@ func (t *Trie) putProofNode(completePath []Nibble, hash []byte) error {
 				// branch.
 				//
 				// Illust.:
-				// ... -> ExtensionNode {commonPrefix} -> the branch created in Case 3.
+				// ... -> ExtensionNode {commonPrefix} -> branch
 				*node = newExtensionNode(leaf.path[:lenCommonPrefix], branch)
 			} else {
 				// If, on the other hand, commonPrefix does not exist, we attach branch directly onto
 				// the Trie.
 				//
 				// Ilust.:
-				// ... -> the branch created in Case 3.
+				// ... -> branch
 				*node = branch
 			}
 
-			if lenCommonPrefix < len(leaf.path) {
-				branchNibble, leafNibbles := leaf.path[lenCommonPrefix], leaf.path[lenCommonPrefix+1:]
-				newLeaf := newLeafNode(leafNibbles, leaf.value)
-				branch.setBranch(branchNibble, newLeaf)
-			}
-
-			if lenCommonPrefix < len(remainingPath) {
-				branchNibble, proofNodeNibbles := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
-				proofNode := newProofNode(proofNodeNibbles, hash)
-				branch.setBranch(branchNibble, proofNode)
-			}
 			return nil
 		case *BranchNode:
 			branchNode := n
 			if len(remainingPath) == 0 {
-				// Arriving at this BranchNode exhausts remainingPath. This case is unreachable if
-				// PreState was created using GetPreStateAndPostState.
-				return fmt.Errorf("proofNode overwrites existing BranchNode")
+				// Illegal case B1:
+				// ProofNode overwrites existing BranchNode.
+				return fmt.Errorf("illegal case B1: read the source of putProofNode")
 			} else {
 				// remainingPath is still not exhausted. Recurse into the branch corresponding to
 				// the first nibble of the remainingPath.
@@ -652,47 +717,62 @@ func (t *Trie) putProofNode(completePath []Nibble, hash []byte) error {
 			proofNode := n
 			lenCommonPrefix := commonPrefixLength(remainingPath, proofNode.path)
 
-			// Case 1: proofNode.path == remainingPath. This case is unreachable if PreState
-			// is valid (read: isPreStateValid). If this case is reached when putProofNode is
-			// used as a subroutine of LoadPostState, then PostState is invalid (redundant
-			// ProofNode).
+			// Illegal case P1:
+			// ProofNode overwrites existing ProofNode.
 			if lenCommonPrefix == len(remainingPath) && lenCommonPrefix == len(proofNode.path) {
-				return fmt.Errorf("proofNode overwrites existing ProofNode")
+				return fmt.Errorf("illegal case P1: read the source of putProofNode")
 			}
 
 			branch := newBranchNode()
 			if lenCommonPrefix == len(remainingPath) {
-				// Case 2: proofNode.path is a superstring of remainingPath. In other words,
-				// proofNode.path contains excess nibbles beyond remainingPath.
-				//
-				// This case cannot be entered in LoadPreState and LoadPostState.
-				// Informal argument: remainingPath should not be fully consumed at this point.
-				return fmt.Errorf("TODO [Alice] are you sure this should error?")
+				// Illegal case P2:
+				// Read "Illegal case L2".
+				return fmt.Errorf("illegal case P2: read the source of putProofNode")
 			} else if lenCommonPrefix == len(proofNode.path) {
-				// Case 3: remainingPath is a superstring of leaf.path. In other words,
-				// remainingPath contains excess nibbles beyond what leaf.path can 'satisfy'.
-				return fmt.Errorf("TODO [Alice] are you sure this should error?")
+				// Illegal case P3:
+				// Read "Illegal case L2".
+				return fmt.Errorf("illegal case P3: read the source of putProofNode")
 			}
 
-			if lenCommonPrefix > 0 {
-				// TODO [Alice]
-				*node = newExtensionNode(proofNode.path[:lenCommonPrefix], branch)
-			} else {
-				// TODO [Alice]
-				*node = branch
-			}
-
-			if lenCommonPrefix < len(proofNode.path) {
+			if len(proofNode.path) > lenCommonPrefix {
+				// If leaf.path is longer than commonPrefix, then we create a new leaf to hold leaf.value.
+				//
+				// Illust.:
+				// ... -> branch
+				//           ⤷ Leaf {leaf.value}
 				branchNibble, proofNodeNibbles := proofNode.path[lenCommonPrefix], proofNode.path[lenCommonPrefix+1:]
 				proofNode := newProofNode(proofNodeNibbles, proofNode.hash())
 				branch.setBranch(branchNibble, proofNode)
 			}
 
-			if lenCommonPrefix < len(remainingPath) {
+			if len(remainingPath) > lenCommonPrefix {
+				// If remainingPath is longer than commonPrefix, then we create a new proof node. This conditional
+				// block must be entered.
+				//
+				// Illust.:
+				// ... -> branch
+				//           ⤷ ProofNode {leaf.value}
 				branchNibble, proofNodeNibbles := remainingPath[lenCommonPrefix], remainingPath[lenCommonPrefix+1:]
 				proofNode := newProofNode(proofNodeNibbles, hash)
 				branch.setBranch(branchNibble, proofNode)
 			}
+
+			if lenCommonPrefix > 0 {
+				// If a commonPrefix exists, we place it in an ExtensionNode which sits before
+				// branch.
+				//
+				// Illust.:
+				// ... -> ExtensionNode {commonPrefix} -> branch
+				*node = newExtensionNode(proofNode.path[:lenCommonPrefix], branch)
+			} else {
+				// If, on the other hand, commonPrefix does not exist, we attach branch directly onto
+				// the Trie.
+				//
+				// Ilust.:
+				// ... -> branch
+				*node = branch
+			}
+
 			return nil
 		default:
 			panic("trie contains a node that cannot be deserialized into either a BranchNode, ExtensionNode, LeafNode, or ProofNode")
