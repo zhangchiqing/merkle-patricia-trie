@@ -343,11 +343,17 @@ func (t *Trie) GetPreAndPseudoPostState() (PreState, PostState) {
 /// does not contain the key "root".
 ///
 /// # Panics
-/// This method panics if called when t.mode != MODE_NORMAL
+/// 1. panics if called when t.mode != MODE_NORMAL.
+/// 2. panics if Trie does not contain hard-coded key "root".
 func (t *Trie) LoadFromDB(db DB) error {
+	if t.mode != MODE_NORMAL {
+		panic("")
+	}
+
+	// DB does not contain the hard-coded key "root".
 	serializedRoot, err := db.Get([]byte("root"))
 	if err != nil {
-		return err
+		panic("")
 	}
 
 	rootNode, err := NodeFromSerialBytes(serializedRoot, db)
