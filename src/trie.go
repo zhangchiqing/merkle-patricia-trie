@@ -871,8 +871,45 @@ func (t *Trie) tryLoadPostStateProof(postStateProof PostStateProof) error {
 	panic("")
 }
 
+// getStrayTrieRootPath returns newNibbles(key) if there is no stray Trie.
 func getStrayTrieRootPath(key []byte, shadowTrie *Trie) []Nibble {
-	panic("")
+	targetPath := newNibbles(key)
+	accumulatedPath := make([]Nibble, 0)
+
+	node := &shadowTrie.root
+	for {
+		// Base case 1: There isn't a stray Trie. Key can be inserted without PostStateProof.
+		if commonPrefixLength(accumulatedPath, targetPath) >= len(targetPath) {
+			return targetPath
+		}
+
+		switch n := (*node).(type) {
+		case *LeafNode:
+			// Base case 2: There isn't a stray Trie. Key can be inserted without PostStateProof.
+			return targetPath
+		case *ProofNode:
+			// Base case 3: There is a stray Trie.
+			return accumulatedPath
+		case *ExtensionNode:
+			extension := n
+			accumulatedPath = append(accumulatedPath, extension.path...)
+			node = &extension.next
+			continue
+		case *BranchNode:
+			branch := n
+			nextNibble := targetPath[commonPrefixLength(accumulatedPath, targetPath)]
+			// Base case 4: There isn't a stray Trie.
+			if branch.branches[nextNibble] == nil {
+				return targetPath
+			} else {
+				accumulatedPath = append(accumulatedPath, nextNibble)
+				node = &branch.branches[nextNibble]
+			}
+			continue
+		default:
+			panic("unreachable code")
+		}
+	}
 }
 
 // getProofPairs returns the PHPairs corresponding to all nodes in trie that is a sibling of of the node identified by

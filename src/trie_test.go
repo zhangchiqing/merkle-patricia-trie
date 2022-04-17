@@ -81,7 +81,6 @@ func TestPut2Pairs(t *testing.T) {
 	coin := trie.Get([]byte{1, 2, 3, 4, 5, 6})
 	require.Equal(t, []byte("coin"), coin)
 
-	fmt.Printf("%T\n", trie.root)
 	ext, ok := trie.root.(*ExtensionNode)
 	require.True(t, ok)
 	branch, ok := ext.next.(*BranchNode)

@@ -7,5 +7,6 @@
    c. Implement getProofPairs.
 4. Implement tryLoadPreState.
 5. Implement tryLoadPostStateProof.
-6. Implement WasPostStateProofsValid and WasPreStateComplete/
-7. Define protobuf message types for PreStateAndPostState.
+6. Implement WasPostStateProofsValid and WasPreStateComplete.
+7. Write integration tests for the 'Generate Fraud Proof Mode' to 'Verify Fraud Proof Mode' sequence flow.
+8. Define protobuf message types for PreStateAndPostState.

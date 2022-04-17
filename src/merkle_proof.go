@@ -34,7 +34,6 @@ func NewProofDB() *ProofDB {
 func (w *ProofDB) Put(key []byte, value []byte) error {
 	keyS := fmt.Sprintf("%x", key)
 	w.kv[keyS] = value
-	fmt.Printf("put key: %x, value: %x\n", key, value)
 	return nil
 }
 

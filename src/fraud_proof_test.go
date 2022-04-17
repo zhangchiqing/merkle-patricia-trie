@@ -86,6 +86,8 @@ func TestPutProofNode(t *testing.T) {
 	// transaction, but have to have their hashes included in the challenge transaction in order
 	// to reproduce the trie root hash.
 	//
+	// Ignore the node marked +Leaf+. This will be used in the later TestGetStrayTrieRootPath.
+	//
 	//                                     Extension
 	//                                         |
 	//                                      Branch
@@ -96,7 +98,7 @@ func TestPutProofNode(t *testing.T) {
 	//                            /      \                      |
 	//                       (Leaf)      Leaf*                Branch
 	//                                                     /    |    \
-	//                                                  Leaf   Leaf   Leaf
+	//                                                  Leaf  +Leaf+   Leaf
 	t.Run("Big_Trie", func(t *testing.T) {
 		// Build trie1.
 		trie1 := NewTrie(MODE_NORMAL)
@@ -144,4 +146,69 @@ func TestPutProofNode(t *testing.T) {
 
 		require.Equal(t, trie1.RootHash(), trie2.RootHash())
 	})
+}
+
+// TestGetStrayTrieRootPath demonstrates the correctness of the getStrayTrieRootPath
+// function by comparing its outputs with manually calculated strayRootPaths.
+//
+// We create a shadowTrie emulating what an L1 MPT would produce after being sent the
+// 2 KVPairs and 4 PHPairs used to produce trie2 in TestPutProofNode/Big_Trie.
+func TestGetStrayTrieRootPath(t *testing.T) {
+	// Copy of Big_Trie.
+	trie1 := NewTrie(MODE_NORMAL)
+	trie1.Put([]byte{00, 00, 00, 00, 00}, []byte("⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷Alice is cute,⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷"))
+	trie1.Put([]byte{00, 00, 00, 00, 01, 00, 00, 00}, []byte("⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷Alice is small.⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷"))
+	trie1.Put([]byte{01}, []byte("⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷These are important facts.⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷"))
+	trie1.Put([]byte{02, 00}, []byte("⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷If you deny these facts,⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷"))
+	trie1.Put([]byte{02}, []byte("⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷then you are evil,⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷"))
+	trie1.Put([]byte{02, 16, 00}, []byte("⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷I don't want to be friends with you,⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷"))
+	trie1.Put([]byte{02, 16, 01}, []byte("⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷and please,⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷"))
+	trie1.Put([]byte{02, 16, 02}, []byte("⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷go away.⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷"))
+
+	middleBranch := trie1.root.(*ExtensionNode).next.(*BranchNode)
+	leftBranch := middleBranch.branches[0].(*ExtensionNode).next.(*BranchNode)
+	leftLeftLeaf := leftBranch.branches[0].(*LeafNode)
+	leftRightLeaf := leftBranch.branches[1].(*LeafNode)
+	middleLeaf := middleBranch.branches[1].(*LeafNode)
+	rightBranch := middleBranch.branches[2].(*BranchNode)
+	rightLeftLeaf := rightBranch.branches[0].(*LeafNode)
+	rightExtension := rightBranch.branches[1].(*ExtensionNode)
+	rightRightBranch := rightExtension.next.(*BranchNode)
+	_ = rightRightBranch.branches[0].(*LeafNode)
+	_ = rightRightBranch.branches[1].(*LeafNode)
+	_ = rightRightBranch.branches[2].(*LeafNode)
+
+	// Build shadowTrie.
+	shadowTrie := NewTrie(MODE_VERIFY_FRAUD_PROOF)
+
+	// Insert read key-value pairs: leftRightLeaf.value and rightBranch.value
+	shadowTrie.Put([]byte{00, 00, 00, 00, 01, 00, 00, 00}, leftRightLeaf.value)
+	shadowTrie.Put([]byte{02}, rightBranch.value)
+
+	// Insert hashes: leftLeftLeaf.hash(), middleLeaf.hash(), rightLeftLeaf.hash(), and rightExtension.hash()
+	shadowTrie.putProofNode(newNibbles([]byte{00, 00, 00, 00, 00}), leftLeftLeaf.hash())
+	shadowTrie.putProofNode(newNibbles([]byte{01}), middleLeaf.hash())
+	shadowTrie.putProofNode(newNibbles([]byte{02, 00}), rightLeftLeaf.hash())
+	shadowTrie.putProofNode(newNibbles([]byte{02, 16}), rightExtension.hash())
+	// Copy of Big_Trie - END //
+
+	// shadowTrie should at this point look like this:
+	//
+	//                          Extension
+	//                              |
+	//                            Branch
+	//                          /   |    \
+	//                 Extension  Proof   Branch
+	//                     |			 /      \
+	//                   Branch	    Proof        Proof (correct stray trie root)
+	//                 /        \
+	//            Proof          Leaf         +set KVPair+
+	//
+	// Now, suppose that the first mutation a fraud proof execution makes is to Set a KVPair corresponding
+	// to the LeafNode marked +Leaf+ in the illustration for +Big Trie+. For this Set, the correct stray
+	// trie root is the rightmost ProofNode in shadowTrie.
+
+	setKey := []byte{02, 16, 01}
+	expectedStrayTrieRootPath := []Nibble{0, 2, 1}
+	require.Equal(t, expectedStrayTrieRootPath, getStrayTrieRootPath(setKey, shadowTrie))
 }

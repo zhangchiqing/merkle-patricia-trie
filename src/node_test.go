@@ -143,15 +143,6 @@ func TestLeafHash(t *testing.T) {
 func Test3Nibbles(t *testing.T) {
 	key, value := []byte{5, 0, 6}, []byte("coin")
 	hexs := printEachCalculationSteps(key, value, true)
-	fmt.Printf("key_hex: %x\n", key)
-	fmt.Printf("value_hex: %x\n", value)
-	fmt.Printf("key in nibbles: %s\n", hexs["key in nibbles"])
-	fmt.Printf("key in nibbles, and prefixed: %s\n", hexs["key in nibbles, and prefixed"])
-	fmt.Printf("key in nibbles, and prefixed, and convert back to buffer: %s\n",
-		hexs["key in nibbles, and prefixed, and convert back to buffer"])
-	fmt.Printf("beforeRLP: %s\n", hexs["beforeRLP"])
-	fmt.Printf("afterRLP: %s\n", hexs["afterRLP"])
-	fmt.Printf("hash: %s\n", hexs["hash"])
 	require.Equal(t, "c5442690f038fcc0b8b8949b4f5149db8c0bee917be6355dc2db1855e9675700",
 		hexs["hash"])
 }

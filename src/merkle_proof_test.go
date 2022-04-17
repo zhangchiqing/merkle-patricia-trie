@@ -1,7 +1,6 @@
 package mpt
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/trie"
@@ -19,7 +18,6 @@ func TestEthProof(t *testing.T) {
 	val, err := trie.VerifyProof(rootHash, []byte{1, 2, 3}, w)
 	require.NoError(t, err)
 	require.Equal(t, []byte("hello"), val)
-	fmt.Printf("root hash: %x\n", rootHash)
 }
 
 func TestMyTrie(t *testing.T) {
@@ -28,10 +26,8 @@ func TestMyTrie(t *testing.T) {
 	tr.Put([]byte{1, 2, 3, 4, 5}, []byte("world"))
 	n0, ok := tr.root.(*ExtensionNode)
 	require.True(t, ok)
-	n1, ok := n0.next.(*BranchNode)
+	_, ok = n0.next.(*BranchNode)
 	require.True(t, ok)
-	fmt.Printf("n0 hash: %x, Serialized: %x\n", n0.hash(), n0.serialized())
-	fmt.Printf("n1 hash: %x, Serialized: %x\n", n1.hash(), n1.serialized())
 }
 
 func TestProveAndVerifyProof(t *testing.T) {
