@@ -1093,9 +1093,10 @@ func collectProofPairs(path []Nibble, branchNode *BranchNode, ignoreBranch int) 
 						value: leaf.value,
 					})
 				} else {
+					// TODO [Alice]: comment on why this copy is necessary.
 					pathToLeafCopy := make([]Nibble, len(pathToLeaf))
-					// TODO [Alice]: comment on why this is necessary.
 					copy(pathToLeafCopy, pathToLeaf)
+
 					// Otherwise, include it as a PHPair.
 					proofPairs = append(proofPairs, PHPair{
 						path: pathToLeafCopy,
@@ -1105,12 +1106,22 @@ func collectProofPairs(path []Nibble, branchNode *BranchNode, ignoreBranch int) 
 			case *ExtensionNode:
 				extension := n
 				pathToExtension := append(pathToBranch, extension.path...)
+
+				// TODO [Alice]: comment on why this copy is necessary.
+				pathToExtensionCopy := make([]Nibble, len(pathToExtension))
+				copy(pathToExtensionCopy, pathToExtension)
+
 				proofPairs = append(proofPairs, PHPair{
 					path: pathToExtension,
 					hash: extension.hash(),
 				})
 			case *BranchNode:
 				branch := n
+
+				// TODO [Alice]: comment on why this copy is necessary.
+				pathToBranchCopy := make([]Nibble, len(pathToBranch))
+				copy(pathToBranchCopy, pathToBranch)
+
 				proofPairs = append(proofPairs, PHPair{
 					path: pathToBranch,
 					hash: branch.hash(),
