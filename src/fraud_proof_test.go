@@ -148,12 +148,15 @@ func TestPutProofNode(t *testing.T) {
 	})
 }
 
-// TestGetStrayTrieRootPath demonstrates the correctness of the getStrayTrieRootPath
-// function by comparing its outputs with manually calculated strayRootPaths.
+// TestGetProofPairs demonstrates:
+// - the correctness of the getStrayTrieRootPath function by comparing its output with a manually calculated
+//   strayTrieRootPath, and
+// - the correctness of the getProofPairs function, feeding strayTrieRootPath as an argument, by
+//   comparing its output with a manually computed list of proofPairs.
 //
 // We create a shadowTrie emulating what an L1 MPT would produce after being sent the
 // 2 KVPairs and 4 PHPairs used to produce trie2 in TestPutProofNode/Big_Trie.
-func TestGetStrayTrieRootPath(t *testing.T) {
+func TestGetProofPairs(t *testing.T) {
 	// Copy of Big_Trie.
 	trie1 := NewTrie(MODE_NORMAL)
 	trie1.Put([]byte{00, 00, 00, 00, 00}, []byte("⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷Alice is cute,⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷⤷"))
@@ -174,9 +177,9 @@ func TestGetStrayTrieRootPath(t *testing.T) {
 	rightLeftLeaf := rightBranch.branches[0].(*LeafNode)
 	rightExtension := rightBranch.branches[1].(*ExtensionNode)
 	rightRightBranch := rightExtension.next.(*BranchNode)
-	_ = rightRightBranch.branches[0].(*LeafNode)
+	rightRightLeftLeaf := rightRightBranch.branches[0].(*LeafNode)
 	_ = rightRightBranch.branches[1].(*LeafNode)
-	_ = rightRightBranch.branches[2].(*LeafNode)
+	rightRightRightLeaf := rightRightBranch.branches[2].(*LeafNode)
 
 	// Build shadowTrie.
 	shadowTrie := NewTrie(MODE_VERIFY_FRAUD_PROOF)
@@ -210,5 +213,28 @@ func TestGetStrayTrieRootPath(t *testing.T) {
 
 	setKey := []byte{02, 16, 01}
 	expectedStrayTrieRootPath := []Nibble{0, 2, 1}
-	require.Equal(t, expectedStrayTrieRootPath, getStrayTrieRootPath(setKey, shadowTrie))
+	actualStrayTrieRootPath := getStrayTrieRootPath(setKey, shadowTrie)
+	require.Equal(t, expectedStrayTrieRootPath, actualStrayTrieRootPath)
+
+	// We now test getProofPairs. getProofPairs should contain proof nodes corresponding to every node under
+	// the rightmost ExtensionNode of trie1 (again, refer to the diagram in Big_Trie):
+	//
+	//                                 ...
+	//                                  |
+	//                              Extension
+	//                                  |
+	//                                Branch
+	//                             /    |    \
+	//                       (Leaf)   +Leaf+  (Leaf)
+	//
+	// We expect getProofPairs to return the hashes of the two leaves marked (Leaf).
+	expectedKVPairs := make([]KVPair, 0)
+	expectedPHPairs := []PHPair{
+		{path: []Nibble{0, 2, 1, 0, 0, 0}, hash: rightRightLeftLeaf.hash()},
+		{path: []Nibble{0, 2, 1, 0, 0, 2}, hash: rightRightRightLeaf.hash()},
+	}
+
+	actualPHPairs, actualKVPairs := getProofPairs(setKey, actualStrayTrieRootPath, trie1)
+	require.Equal(t, expectedKVPairs, actualKVPairs)
+	require.Equal(t, expectedPHPairs, actualPHPairs)
 }

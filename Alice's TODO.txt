@@ -4,7 +4,7 @@
 3. Implement GetPreStateAndPostState
    a. Write skeleton implementation - Done.
    b. Implement getStrayTrieRootPath - Done.
-   c. Implement getProofPairs.
+   c. Implement getProofPairs - Done.
 4. Implement tryLoadPreState.
 5. Implement tryLoadPostStateProof.
 6. Implement WasPostStateProofsValid and WasPreStateComplete.

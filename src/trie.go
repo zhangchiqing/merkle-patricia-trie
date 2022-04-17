@@ -925,7 +925,9 @@ func getProofPairs(key []byte, strayTrieRootPath []Nibble, trie *Trie) ([]PHPair
 	accumulatedPath := make([]Nibble, 0)
 	visitedNodes := make([]*Node, 0)
 
+	///////////////////////////////////////////
 	// 1. Navigate to the node that stores key
+	///////////////////////////////////////////
 	node := &trie.root
 	for {
 		if reflect.DeepEqual(accumulatedPath, targetPath) {
@@ -969,17 +971,29 @@ func getProofPairs(key []byte, strayTrieRootPath []Nibble, trie *Trie) ([]PHPair
 	phPairs := make([]PHPair, 0)
 	kvPairs := make([]KVPair, 0)
 
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// 2. Backtrack to the node identified by strayTrieRootPath, collecting PHPairs and KVPairs along the way.
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////
 	if len(visitedNodes) == 0 {
 		// SAFETY: getProofPairs is only entered after the Trie has been Put once.
 		panic("unreachable code")
 	}
-	// Pop the Put LeafNode
+	// Pop the last Put Node. This means popping the last item in visitedNodes, and slicing accumulatedPath accordingly.
 	visitedNodes, previouslyVisitedNode := visitedNodes[:len(visitedNodes)-1], visitedNodes[len(visitedNodes)-1]
 	decumulatedPath := accumulatedPath
+	switch n := (*previouslyVisitedNode).(type) {
+	case *BranchNode:
+		decumulatedPath = accumulatedPath[:len(accumulatedPath)-1]
+	case *LeafNode:
+		leaf := n
+		decumulatedPath = accumulatedPath[:len(accumulatedPath)-(1+len(leaf.path))]
+	default:
+		panic("unreachable code")
+	}
 	node = visitedNodes[len(visitedNodes)-1]
 	for {
-		if commonPrefixLength(decumulatedPath, strayTrieRootPath) == 0 {
+		if len(decumulatedPath) < len(strayTrieRootPath) {
+			// TODO [Alice]: document base case.
 			break
 		}
 		switch n := (*node).(type) {
@@ -1013,7 +1027,7 @@ func getProofPairs(key []byte, strayTrieRootPath []Nibble, trie *Trie) ([]PHPair
 			extension := n
 			decumulatedPath = decumulatedPath[:len(decumulatedPath)-(1+len(extension.path))]
 		default:
-			// visitedNodes cannot have contained LeafNodes and ProofNodes.
+			// SAFETY: visitedNodes cannot have contained LeafNodes and ProofNodes.
 			panic("unreachable code")
 		}
 
@@ -1028,14 +1042,12 @@ func getProofPairs(key []byte, strayTrieRootPath []Nibble, trie *Trie) ([]PHPair
 // collectProofPair returns a slice of either KVPairs, or PHPairs. Path is the path from the root of the origin Trie
 // to branchNode.
 func collectProofPairs(path []Nibble, branchNode *BranchNode, ignoreBranch int) []interface{} {
-	if len(path)%2 != 0 {
-		// TODO [Alice]: write a SAFETY comment.
-		panic("unreachable code")
-	}
 	proofPairs := make([]interface{}, 0)
 
 	if branchNode.value != nil {
-		proofPairs = append(proofPairs, interface{}(KVPair{key: nibblesAsBytes(path), value: branchNode.value}))
+		a := KVPair{key: nibblesAsBytes(path), value: branchNode.value}
+		b := interface{}(a)
+		proofPairs = append(proofPairs, b)
 	}
 
 	for branchIndex, node := range branchNode.branches {
@@ -1048,7 +1060,8 @@ func collectProofPairs(path []Nibble, branchNode *BranchNode, ignoreBranch int) 
 		} else {
 			branchNibble, err := bytesAsNibbles(byte(branchIndex))
 			if err != nil {
-				// TODO [Alice]: write a SAFETY comment.
+				// SAFETY: bytesAsNibbles does not return an error if its input has value in range [0, 16). branchIndex's
+				// highest value is 15.
 				panic("unreachable code")
 			}
 
@@ -1061,8 +1074,13 @@ func collectProofPairs(path []Nibble, branchNode *BranchNode, ignoreBranch int) 
 				leaf := n
 				pathToLeaf := append(pathToBranch, leaf.path...)
 
-				// TODO [Alice]: write a SAFETY comment.
-				if len(pathToLeaf)%2 != 0 || leaf.value == nil {
+				if leaf.value == nil {
+					// SAFETY: by construction, Tries cannot have leaves with nil values.
+					panic("unreachable code")
+				}
+				if len(pathToLeaf)%2 != 0 {
+					// SAFETY: A LeafNode could have only been added to a Trie using Put. If Put takes a byte slice of length n
+					// as a key, the path of the Put LeafNode is precisely 2n, which is even.
 					panic("unreachable code")
 				}
 
@@ -1075,12 +1093,15 @@ func collectProofPairs(path []Nibble, branchNode *BranchNode, ignoreBranch int) 
 						value: leaf.value,
 					})
 				} else {
+					pathToLeafCopy := make([]Nibble, len(pathToLeaf))
+					// TODO [Alice]: comment on why this is necessary.
+					copy(pathToLeafCopy, pathToLeaf)
+					// Otherwise, include it as a PHPair.
 					proofPairs = append(proofPairs, PHPair{
-						path: pathToLeaf,
+						path: pathToLeafCopy,
 						hash: leaf.hash(),
 					})
 				}
-				continue
 			case *ExtensionNode:
 				extension := n
 				pathToExtension := append(pathToBranch, extension.path...)
@@ -1088,7 +1109,6 @@ func collectProofPairs(path []Nibble, branchNode *BranchNode, ignoreBranch int) 
 					path: pathToExtension,
 					hash: extension.hash(),
 				})
-				continue
 			case *BranchNode:
 				branch := n
 				proofPairs = append(proofPairs, PHPair{
@@ -1097,8 +1117,8 @@ func collectProofPairs(path []Nibble, branchNode *BranchNode, ignoreBranch int) 
 				})
 			default:
 				panic("trie contains a node that cannot be deserialized to either a LeafNode, ProofNode, BranchNode, or ExtensionNode")
-
 			}
+			continue
 		}
 	}
 
