@@ -35,17 +35,20 @@ import (
 //    Op 1. NewTrie(mode: VERIFY_FRAUD_PROOF)
 //    Op 2. preState, postState = DeserializePreState(serializedPreState),
 //                                                       DeserializePostState(serializedPostState)
-//    Op 3. LoadPreStateAndPostState(preState, postState)
-//    Op 4. stateRoot = GetStateRoot()
-//    Op 5. if stateRoot != published StateRoot before fraudulent transaction.
+//    Op 3. preStateErr := LoadPreStateAndPostState(preState, postState)
+//	  Op 4. if preStateErr != nil
+//          then break (fraud proof unsuccessful)
+//		    else continue
+//    Op 5. stateRoot = GetStateRoot()
+//    Op 6. if stateRoot != published StateRoot before fraudulent transaction.
 //          then break (fraud proof unsuccessful)
 //          else continue
-//    Op 4. *Get/Put()
-//    Op 5. if WasPostStateProofsValid() && WasPreStateComplete()
+//    Op 7. *Get/Put()
+//    Op 8. if WasPostStateProofsValid() && WasPreStateComplete()
 //          then break (fraud proof unsuccessful)
 //          else continue
-//    Op 6. stateRoot = GetStateRoot()
-//    Op 7. if stateRoot == published StateRoot after fraudulent transaction.
+//    Op 9. stateRoot = GetStateRoot()
+//    Op 10. if stateRoot == published StateRoot after fraudulent transaction.
 //          then break (fraud proof unsuccessful)
 //          else disable the rollup
 //
@@ -487,18 +490,25 @@ func (t *Trie) GetPreStateAndPostStateProofs() (PreState, PostStateProofs) {
 ///
 /// # Panics
 ///Panics if called when t.mode != MODE_VERIFY_FRAUD_PROOF.
-func (t *Trie) LoadPreAndPostState(preState PreState, postState PostStateProofs) {
+func (t *Trie) LoadPreAndPostState(preState PreState, postState PostStateProofs, expectedPreStateHash []byte) (preStateError error) {
 	if t.mode != MODE_VERIFY_FRAUD_PROOF {
 		panic("")
 	}
 
-	for _, phPair := range preState.phPairs {
-		t.putProofNode(phPair.path, phPair.hash)
+	err := t.tryLoadPreState(preState)
+	if err != nil {
+		t.mode = MODE_FAILED_FRAUD_PROOF
+		return err
 	}
 
-	for _, kvPair := range preState.kvPairs {
-		t.Put(kvPair.key, kvPair.value)
+	if reflect.DeepEqual(t.RootHash(), expectedPreStateHash) {
+		t.mode = MODE_FAILED_FRAUD_PROOF
+		return fmt.Errorf("t.RootHash() after PreState insertion does not match expectedPreStateHash")
 	}
+
+	t.postStateProofs = postState
+
+	return nil
 }
 
 // LoadFromDB populates the Trie with data from db. It returns an error if db
@@ -872,7 +882,22 @@ func (t *Trie) putProofNode(path []Nibble, hash []byte) error {
 }
 
 func (t *Trie) tryLoadPreState(preState PreState) error {
-	panic("")
+	if t.mode != MODE_VERIFY_FRAUD_PROOF {
+		panic("")
+	}
+
+	for _, phPair := range preState.phPairs {
+		err := t.putProofNode(phPair.path, phPair.hash)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, kvPair := range preState.kvPairs {
+		t.Put(kvPair.key, kvPair.value)
+	}
+
+	return nil
 }
 
 // tryLoadPostStateProof

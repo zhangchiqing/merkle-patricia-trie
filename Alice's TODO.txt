@@ -5,7 +5,7 @@
    a. Write skeleton implementation - Done.
    b. Implement getStrayTrieRootPath - Done.
    c. Implement getProofPairs - Done.
-4. Implement tryLoadPreState - Up next.
+4. Implement tryLoadPreState - Done.
 5. Implement tryLoadPostStateProof.
 6. Implement WasPostStateProofsValid and WasPreStateComplete.
 7. Write integration tests for the 'Generate Fraud Proof Mode' to 'Verify Fraud Proof Mode' sequence flow.
