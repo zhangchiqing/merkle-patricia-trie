@@ -427,20 +427,24 @@ func (t *Trie) GetPreStateAndPostStateProofs() (PreState, PostStateProofs) {
 
 		// 1.3. Collect 'Proof Pairs', phPairs and kvPairs in the strayTrie that are either siblings of
 		// the node that contains kvPair, or a direct child of its ancestors.
-		phPairs, proofKVPairs := getProofPairs(kvPair.key, strayTrieRootPath, shadowTrie)
+		if !reflect.DeepEqual(strayTrieRootPath, newNibbles(kvPair.key)) {
+			// If strayTrieRootPath == newNibbles(kvPair.key), then there is no stray Trie, and there is
+			// no need to call getProofPairs.
+			phPairs, proofKVPairs := getProofPairs(kvPair.key, strayTrieRootPath, shadowTrie)
+			// 1.4. Add Proof Pairs to preState.
+			preState.kvPairs = append(preState.kvPairs, kvPair)
+			preState.kvPairs = append(preState.kvPairs, proofKVPairs...)
+			preState.phPairs = append(preState.phPairs, phPairs...)
 
-		// 1.4. Add Proof Pairs to preState.
-		preState.kvPairs = append(preState.kvPairs, kvPair)
-		preState.kvPairs = append(preState.kvPairs, proofKVPairs...)
-		preState.phPairs = append(preState.phPairs, phPairs...)
+			// 1.5. Update shadowTrie with phPairs and proofKVPairs.
+			for _, phPair := range phPairs {
+				shadowTrie.putProofNode(phPair.path, phPair.hash)
+			}
+			for _, proofKVPair := range proofKVPairs {
+				shadowTrie.Put(proofKVPair.key, proofKVPair.value)
+			}
+		}
 
-		// 1.5. Update shadowTrie with phPairs and proofKVPairs.
-		for _, phPair := range phPairs {
-			shadowTrie.putProofNode(phPair.path, phPair.hash)
-		}
-		for _, proofKVPair := range proofKVPairs {
-			shadowTrie.Put(proofKVPair.key, proofKVPair.value)
-		}
 	}
 
 	///////////////////////////////
@@ -455,17 +459,21 @@ func (t *Trie) GetPreStateAndPostStateProofs() (PreState, PostStateProofs) {
 		shadowTrie.Put(kvPair.key, kvPair.value)
 
 		// 2.3. Collect Proof Pairs.
-		phPairs, proofKVPairs := getProofPairs(kvPair.key, strayTrieRootPath, shadowTrie)
+		if !reflect.DeepEqual(strayTrieRootPath, newNibbles(kvPair.key)) {
+			// If strayTrieRootPath == newNibbles(kvPair.key), then there is no stray Trie, and there is
+			// no need to call getProofPairs.
+			phPairs, proofKVPairs := getProofPairs(kvPair.key, strayTrieRootPath, shadowTrie)
 
-		// 2.4. Add Proof Pairs to postStateProofs
-		postStateProofs = append(postStateProofs, PostStateProof{phPairs, proofKVPairs})
+			// 2.4. Add Proof Pairs to postStateProofs
+			postStateProofs = append(postStateProofs, PostStateProof{phPairs, proofKVPairs})
 
-		// Update shadowTrie with phPairs and proofKVPairs
-		for _, phPair := range phPairs {
-			shadowTrie.putProofNode(phPair.path, phPair.hash)
-		}
-		for _, proofKVPair := range proofKVPairs {
-			shadowTrie.Put(proofKVPair.key, proofKVPair.value)
+			// Update shadowTrie with phPairs and proofKVPairs
+			for _, phPair := range phPairs {
+				shadowTrie.putProofNode(phPair.path, phPair.hash)
+			}
+			for _, proofKVPair := range proofKVPairs {
+				shadowTrie.Put(proofKVPair.key, proofKVPair.value)
+			}
 		}
 	}
 
@@ -867,6 +875,7 @@ func (t *Trie) tryLoadPreState(preState PreState) error {
 	panic("")
 }
 
+// tryLoadPostStateProof
 func (t *Trie) tryLoadPostStateProof(postStateProof PostStateProof) error {
 	panic("")
 }
