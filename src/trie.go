@@ -31,25 +31,33 @@ import (
 //    Op 4. preState, postState = GetPreAndPostState()
 //    Op 5. serializedPreState, serializedPostState = preState.Serialize(), postState.Serialize()
 //
-// 3. Execute fraud proof mode:
+// 3. Verify fraud proof mode:
 //    Op 1. NewTrie(mode: VERIFY_FRAUD_PROOF)
 //    Op 2. preState, postState = DeserializePreState(serializedPreState),
 //                                                       DeserializePostState(serializedPostState)
 //    Op 3. LoadPreStateAndPostState(preState, postState)
+//    Op 4. stateRoot = GetStateRoot()
+//    Op 5. if stateRoot != published StateRoot before fraudulent transaction.
+//          then break (fraud proof unsuccessful)
+//          else continue
 //    Op 4. *Get/Put()
-//    Op 5. if WasPreStateComplete() then continue else exit
+//    Op 5. if WasPostStateProofsValid() && WasPreStateComplete()
+//          then break (fraud proof unsuccessful)
+//          else continue
 //    Op 6. stateRoot = GetStateRoot()
-//    Op 7. if stateRoot == publishedStateRoot
-//          then do nothing
+//    Op 7. if stateRoot == published StateRoot after fraudulent transaction.
+//          then break (fraud proof unsuccessful)
 //          else disable the rollup
+//
+// *OP indicates that multiple operations of OP-sort may happen.
 type Trie struct {
 	root Node
 	mode TrieMode
 
-	// readSet, preStateProofNodes, and writeList are non-Nil only when mode == MODE_GENERATE_FRAUD_PROOF.
-	readSet            []KVPair
-	preStateProofNodes []ProofNode
-	writeList          []KVPair
+	// readSet, postStateProofs, and writeList are non-Nil only when mode == MODE_GENERATE_FRAUD_PROOF.
+	readSet         []KVPair
+	writeList       []KVPair
+	postStateProofs PostStateProofs
 }
 
 type TrieMode = uint
@@ -62,18 +70,42 @@ const (
 	MODE_DEAD                 TrieMode = 4
 )
 
+// KVPair stands for "Key, Value Pair".
 type KVPair struct {
 	key   []byte
 	value []byte
 }
 
-// PreState is an array of either: ProofNode, or KVPair.
-type PreState []interface{}
-
-// PostState is an array of ProofNodes.
-type PostState []struct {
+// PHPair stands for "Path, Hash Pair". PHPairs are inserted into Trie using putProofNode.
+type PHPair struct {
 	path []Nibble
 	hash []byte
+}
+
+type PreState struct {
+	kvPairs []KVPair
+	phPairs []PHPair
+}
+
+func newPreState() PreState {
+	return PreState{
+		kvPairs: make([]KVPair, 0),
+		phPairs: make([]PHPair, 0),
+	}
+}
+
+// PostStateProof 'proves' a single mutation (Set) during fraud proof execution.
+type PostStateProof struct {
+	phPairs      []PHPair
+	proofKVPairs []KVPair
+}
+
+// PostStateProofs is a slice of PostStateProof. Its length must be exactly the number of mutations
+// done by the fraudulent transaction.
+type PostStateProofs []PostStateProof
+
+func newPostStateProofs() PostStateProofs {
+	return make([]PostStateProof, 0)
 }
 
 // NewTrie returns an empty Trie in the specified mode. A Trie, once constructed, cannot have its
@@ -148,6 +180,11 @@ func (t *Trie) Get(key []byte) []byte {
 func (t *Trie) Put(key []byte, value []byte) {
 	if t.mode != MODE_NORMAL && t.mode != MODE_GENERATE_FRAUD_PROOF && t.mode != MODE_VERIFY_FRAUD_PROOF {
 		panic("")
+	}
+
+	// Update writeList.
+	if t.mode == MODE_GENERATE_FRAUD_PROOF || t.mode == MODE_VERIFY_FRAUD_PROOF {
+		t.writeList = append(t.writeList, KVPair{key, value})
 	}
 
 	node := &t.root
@@ -361,52 +398,98 @@ func (t *Trie) RootHash() []byte {
 	return t.root.hash()
 }
 
-// GetPreAndPostState returns PreState: the list of key-value pairs that have to be loaded into
-// a Trie (using `LoadPreState`) to serve reads into world state during fraud proof execution, and
-// PseudoPostState: the list of PseudoNodes that have to be loaded into a Trie (using `LoadPostState`)
+// GetPreStateAndPostStateProofs returns PreState: the list of KVPairs and PHPairs that have to be loaded into
+// a Trie (using `tryLoadPreState`) to serve reads into world state during fraud proof execution, and
+// postStateProofs: the list of PostStateProofs that have to be loaded into a Trie (using `tryLoadPostStateProofs`)
 // to calculate its post state root after fraud proof execution.
 //
 // After calling this method, the Trie becomes dead.
 //
 // # Panics
 // Panics if called when t.mode != MODE_GENERATE_FRAUD_PROOF.
-func (t *Trie) GetPreAndPostState() (PreState, PostState) {
+func (t *Trie) GetPreStateAndPostStateProofs() (PreState, PostStateProofs) {
 	if t.mode != MODE_GENERATE_FRAUD_PROOF {
 		panic("attempted to GetPreAndPseudoPostState, but Trie is not in generate fraud proof mode.")
 	}
 
-	preState := make(PreState, 0)
+	/////////////////////////
+	// 1. Generate PreState
+	/////////////////////////
+	preState := newPreState()
+	shadowTrie := NewTrie(MODE_VERIFY_FRAUD_PROOF)
 	for _, kvPair := range t.readSet {
-		preState = append(preState, interface{}(kvPair))
+		// 1.1. Use shadowTrie to get the path to the root of the 'Stray Trie', the subtrie of (t *Trie)
+		// whose nodes have paths that are superstrings of kvPair.key && are not 'Trusted Nodes' yet.
+		strayTrieRootPath := getStrayTrieRootPath(kvPair.key, shadowTrie)
+
+		// 1.2. Update shadowTrie with the kvPair.
+		shadowTrie.Put(kvPair.key, kvPair.value)
+
+		// 1.3. Collect 'Proof Pairs', phPairs and kvPairs in the strayTrie that are either siblings of
+		// the node that contains kvPair, or a direct child of its ancestors.
+		phPairs, proofKVPairs := getProofPairs(kvPair.key, shadowTrie, strayTrieRootPath)
+
+		// 1.4. Add Proof Pairs to preState.
+		preState.kvPairs = append(preState.kvPairs, kvPair)
+		preState.kvPairs = append(preState.kvPairs, proofKVPairs...)
+		preState.phPairs = append(preState.phPairs, phPairs...)
+
+		// 1.5. Update shadowTrie with phPairs and proofKVPairs.
+		for _, phPair := range phPairs {
+			shadowTrie.putProofNode(phPair.path, phPair.hash)
+		}
+		for _, proofKVPair := range proofKVPairs {
+			shadowTrie.Put(proofKVPair.key, proofKVPair.value)
+		}
 	}
 
-	// TODO [Alice]
-	post_state := make(PostState, 0)
+	///////////////////////////////
+	// 2. Generate PostStateProof
+	///////////////////////////////
+	postStateProofs := newPostStateProofs()
+	for _, kvPair := range t.writeList {
+		// 2.1. Use shadowTrie to get the path to the root of the Stray Trie
+		strayTrieRootPath := getStrayTrieRootPath(kvPair.key, shadowTrie)
 
+		// 2.2. Update shadowTrie with the kvPair
+		shadowTrie.Put(kvPair.key, kvPair.value)
+
+		// 2.3. Collect Proof Pairs.
+		phPairs, proofKVPairs := getProofPairs(kvPair.key, shadowTrie, strayTrieRootPath)
+
+		// 2.4. Add Proof Pairs to postStateProofs
+		postStateProofs = append(postStateProofs, PostStateProof{phPairs, proofKVPairs})
+
+		// Update shadowTrie with phPairs and proofKVPairs
+		for _, phPair := range phPairs {
+			shadowTrie.putProofNode(phPair.path, phPair.hash)
+		}
+		for _, proofKVPair := range proofKVPairs {
+			shadowTrie.Put(proofKVPair.key, proofKVPair.value)
+		}
+	}
+
+	// Disable trie
 	t.mode = MODE_DEAD
 
-	return preState, post_state
+	return preState, postStateProofs
 }
 
 /// LoadPreAndPostState prepares a Trie to be used in MODE_VERIFY_FRAUD_PROOF.
 ///
 /// # Panics
 ///Panics if called when t.mode != MODE_VERIFY_FRAUD_PROOF.
-func (t *Trie) LoadPreAndPostState(preState PreState, postState PostState) {
+func (t *Trie) LoadPreAndPostState(preState PreState, postState PostStateProofs) {
 	if t.mode != MODE_VERIFY_FRAUD_PROOF {
 		panic("")
 	}
 
-	for _, kvPairOrProofNode := range preState {
-		switch v := kvPairOrProofNode.(type) {
-		case ProofNode:
-			// TODO [Alice]
-			panic("")
-		case KVPair:
-			t.Put(v.key, v.value)
-		default:
-			panic("unreachable code")
-		}
+	for _, phPair := range preState.phPairs {
+		t.putProofNode(phPair.path, phPair.hash)
+	}
+
+	for _, kvPair := range preState.kvPairs {
+		t.Put(kvPair.key, kvPair.value)
 	}
 }
 
@@ -556,13 +639,13 @@ func (t *Trie) getNormally(key []byte) []byte {
 // 1. Panics if mode != MODE_VERIFY_FRAUD_PROOF
 // 2. Panics if the Trie contains a node that cannot be deserialized into either a LeafNode, BranchNode, ExtensionNode,
 //    or ProofNode.
-func (t *Trie) putProofNode(completePath []Nibble, hash []byte) error {
+func (t *Trie) putProofNode(path []Nibble, hash []byte) error {
 	if t.mode != MODE_VERIFY_FRAUD_PROOF {
 		panic("")
 	}
 
 	node := &t.root
-	remainingPath := completePath
+	remainingPath := path
 	for {
 		if *node == nil {
 			*node = newProofNode(remainingPath, hash)
@@ -780,25 +863,24 @@ func (t *Trie) putProofNode(completePath []Nibble, hash []byte) error {
 	}
 }
 
-func minimizePreState(preState PreState) PreState {
-	// TODO [Alice]
+func (t *Trie) tryLoadPreState(preState PreState) error {
 	panic("")
 }
 
-func minimizePostState(postState PostState) PostState {
-	// TODO [Alice]
+func (t *Trie) tryLoadPostStateProof(postStateProof PostStateProof) error {
 	panic("")
 }
 
-// isPreStateValid returns whether preState meets two simple validity conditions:
-// 1. Its elements are either KVPair, or ProofNode.
-// 2. ProofNode elements appear before KVPair elements. LoadPreState ranges through preState
-//    from front to rear, iteratively building up the mode == MODE_VERIFY_FRAUD_PROOF trie.
-//    this second validity condition ensures that during this process, ProofNodes do not
-//    overwrite already-inserted KVPairs.
+func getStrayTrieRootPath(key []byte, shadowTrie *Trie) []Nibble {
+	panic("")
+}
+
+// getProofPairs returns the PHPairs corresponding to all nodes in trie that is a sibling of of the node identified by
+// key, or a direct child of any of its ancestors, *except* those that hash to an entry in trustedNodes. Nodes that
+// serialize to less than 32 bytes are included as a KVPair in the second return value instead.
 //
-// PreState pre-processed by minimizePreState are guaranteed to pass this isPreStateValid.
-func isPreStateValid(preState PreState) bool {
-	// TODO [Alice]
+// This routine makes the optimizing assumption that if a node is a trustedNode, all of its ancestors are also
+// trustedNodes and can be ignored.
+func getProofPairs(key []byte, trie *Trie, strayTrieRootPath []Nibble) ([]PHPair, []KVPair) {
 	panic("")
 }
