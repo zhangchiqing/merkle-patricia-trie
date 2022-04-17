@@ -70,7 +70,7 @@ const (
 	MODE_DEAD                 TrieMode = 4
 )
 
-// KVPair stands for "Key, Value Pair".
+// KVPair stands for "Key, Value Pair". KVPairs are inserted into Trie using Put.
 type KVPair struct {
 	key   []byte
 	value []byte
@@ -427,7 +427,7 @@ func (t *Trie) GetPreStateAndPostStateProofs() (PreState, PostStateProofs) {
 
 		// 1.3. Collect 'Proof Pairs', phPairs and kvPairs in the strayTrie that are either siblings of
 		// the node that contains kvPair, or a direct child of its ancestors.
-		phPairs, proofKVPairs := getProofPairs(kvPair.key, shadowTrie, strayTrieRootPath)
+		phPairs, proofKVPairs := getProofPairs(kvPair.key, strayTrieRootPath, shadowTrie)
 
 		// 1.4. Add Proof Pairs to preState.
 		preState.kvPairs = append(preState.kvPairs, kvPair)
@@ -455,7 +455,7 @@ func (t *Trie) GetPreStateAndPostStateProofs() (PreState, PostStateProofs) {
 		shadowTrie.Put(kvPair.key, kvPair.value)
 
 		// 2.3. Collect Proof Pairs.
-		phPairs, proofKVPairs := getProofPairs(kvPair.key, shadowTrie, strayTrieRootPath)
+		phPairs, proofKVPairs := getProofPairs(kvPair.key, strayTrieRootPath, shadowTrie)
 
 		// 2.4. Add Proof Pairs to postStateProofs
 		postStateProofs = append(postStateProofs, PostStateProof{phPairs, proofKVPairs})
@@ -875,7 +875,6 @@ func (t *Trie) tryLoadPostStateProof(postStateProof PostStateProof) error {
 func getStrayTrieRootPath(key []byte, shadowTrie *Trie) []Nibble {
 	targetPath := newNibbles(key)
 	accumulatedPath := make([]Nibble, 0)
-
 	node := &shadowTrie.root
 	for {
 		// Base case 1: There isn't a stray Trie. Key can be inserted without PostStateProof.
@@ -916,8 +915,192 @@ func getStrayTrieRootPath(key []byte, shadowTrie *Trie) []Nibble {
 // key, or a direct child of any of its ancestors, *except* those that hash to an entry in trustedNodes. Nodes that
 // serialize to less than 32 bytes are included as a KVPair in the second return value instead.
 //
+// An intuitive way to think about getProofPairs is that it uses key and strayTrieRootPaths as 'upper and lower bounds'
+// to form a subtrie from trie.
+//
 // This routine makes the optimizing assumption that if a node is a trustedNode, all of its ancestors are also
 // trustedNodes and can be ignored.
-func getProofPairs(key []byte, trie *Trie, strayTrieRootPath []Nibble) ([]PHPair, []KVPair) {
-	panic("")
+func getProofPairs(key []byte, strayTrieRootPath []Nibble, trie *Trie) ([]PHPair, []KVPair) {
+	targetPath := newNibbles(key)
+	accumulatedPath := make([]Nibble, 0)
+	visitedNodes := make([]*Node, 0)
+
+	// 1. Navigate to the node that stores key
+	node := &trie.root
+	for {
+		if reflect.DeepEqual(accumulatedPath, targetPath) {
+			break
+		}
+		switch n := (*node).(type) {
+		case *ProofNode:
+			// SAFETY: trie should not contain any ProofNodes.
+			panic("unreachable code")
+		case *LeafNode:
+			leaf := n
+			accumulatedPath = append(accumulatedPath, leaf.path...)
+			if !reflect.DeepEqual(accumulatedPath, targetPath) {
+				// SAFETY: unreachable if key is already put in trie beforehand.
+				panic("unreachable code")
+			}
+		case *BranchNode:
+			branch := n
+			nextNibble := targetPath[commonPrefixLength(accumulatedPath, targetPath)]
+			if reflect.DeepEqual(accumulatedPath, targetPath) && branch.value == nil {
+				// SAFETY: unreachable if key is already put in trie beforehand.
+				panic("unreachable code")
+			}
+			if branch.branches[nextNibble] == nil {
+				// SAFETY: unreachable if key is already put in trie beforehand.
+				panic("unreachable code")
+			}
+			accumulatedPath = append(accumulatedPath, nextNibble)
+			node = &branch.branches[nextNibble]
+		case *ExtensionNode:
+			extension := n
+			accumulatedPath = append(accumulatedPath, extension.path...)
+			node = &extension.next
+		default:
+			panic("trie contains a node that cannot be deserialized to either a LeafNode, ProofNode, BranchNode, or ExtensionNode")
+		}
+		visitedNodes = append(visitedNodes, node)
+		continue
+	}
+
+	phPairs := make([]PHPair, 0)
+	kvPairs := make([]KVPair, 0)
+
+	// 2. Backtrack to the node identified by strayTrieRootPath, collecting PHPairs and KVPairs along the way.
+	if len(visitedNodes) == 0 {
+		// SAFETY: getProofPairs is only entered after the Trie has been Put once.
+		panic("unreachable code")
+	}
+	// Pop the Put LeafNode
+	visitedNodes, previouslyVisitedNode := visitedNodes[:len(visitedNodes)-1], visitedNodes[len(visitedNodes)-1]
+	decumulatedPath := accumulatedPath
+	node = visitedNodes[len(visitedNodes)-1]
+	for {
+		if commonPrefixLength(decumulatedPath, strayTrieRootPath) == 0 {
+			break
+		}
+		switch n := (*node).(type) {
+		case *BranchNode:
+			branch := n
+			branchIndexOfPreviouslyVisitedNode := -1
+			for i, n := range branch.branches {
+				if n == *previouslyVisitedNode {
+					branchIndexOfPreviouslyVisitedNode = i
+					break
+				}
+			}
+			if branchIndexOfPreviouslyVisitedNode == -1 {
+				panic("unreachable code")
+			}
+			proofPairs := collectProofPairs(decumulatedPath, branch, branchIndexOfPreviouslyVisitedNode)
+			for _, proofPair := range proofPairs {
+				switch p := proofPair.(type) {
+				case KVPair:
+					kvPair := p
+					kvPairs = append(kvPairs, kvPair)
+				case PHPair:
+					phPair := p
+					phPairs = append(phPairs, phPair)
+				default:
+					panic("unreachable code")
+				}
+			}
+			decumulatedPath = decumulatedPath[:len(decumulatedPath)-1]
+		case *ExtensionNode:
+			extension := n
+			decumulatedPath = decumulatedPath[:len(decumulatedPath)-(1+len(extension.path))]
+		default:
+			// visitedNodes cannot have contained LeafNodes and ProofNodes.
+			panic("unreachable code")
+		}
+
+		visitedNodes, previouslyVisitedNode = visitedNodes[:len(visitedNodes)-1], visitedNodes[len(visitedNodes)-1]
+		node = visitedNodes[len(visitedNodes)-1]
+		continue
+	}
+
+	return phPairs, kvPairs
+}
+
+// collectProofPair returns a slice of either KVPairs, or PHPairs. Path is the path from the root of the origin Trie
+// to branchNode.
+func collectProofPairs(path []Nibble, branchNode *BranchNode, ignoreBranch int) []interface{} {
+	if len(path)%2 != 0 {
+		// TODO [Alice]: write a SAFETY comment.
+		panic("unreachable code")
+	}
+	proofPairs := make([]interface{}, 0)
+
+	if branchNode.value != nil {
+		proofPairs = append(proofPairs, interface{}(KVPair{key: nibblesAsBytes(path), value: branchNode.value}))
+	}
+
+	for branchIndex, node := range branchNode.branches {
+		if branchIndex == ignoreBranch {
+			continue
+		}
+
+		if node == nil {
+			continue
+		} else {
+			branchNibble, err := bytesAsNibbles(byte(branchIndex))
+			if err != nil {
+				// TODO [Alice]: write a SAFETY comment.
+				panic("unreachable code")
+			}
+
+			pathToBranch := append(path, branchNibble...)
+			switch n := node.(type) {
+			case *ProofNode:
+				// SAFETY: trie should not contain any ProofNodes.
+				panic("unreachable code")
+			case *LeafNode:
+				leaf := n
+				pathToLeaf := append(pathToBranch, leaf.path...)
+
+				// TODO [Alice]: write a SAFETY comment.
+				if len(pathToLeaf)%2 != 0 || leaf.value == nil {
+					panic("unreachable code")
+				}
+
+				if len(leaf.serialized()) < 32 {
+					// If serialized leaf is smaller than size of Keccak256 hash, include it directly in proofPairs
+					// as a KVPair
+					leafKey := nibblesAsBytes(pathToLeaf)
+					proofPairs = append(proofPairs, KVPair{
+						key:   leafKey,
+						value: leaf.value,
+					})
+				} else {
+					proofPairs = append(proofPairs, PHPair{
+						path: pathToLeaf,
+						hash: leaf.hash(),
+					})
+				}
+				continue
+			case *ExtensionNode:
+				extension := n
+				pathToExtension := append(pathToBranch, extension.path...)
+				proofPairs = append(proofPairs, PHPair{
+					path: pathToExtension,
+					hash: extension.hash(),
+				})
+				continue
+			case *BranchNode:
+				branch := n
+				proofPairs = append(proofPairs, PHPair{
+					path: pathToBranch,
+					hash: branch.hash(),
+				})
+			default:
+				panic("trie contains a node that cannot be deserialized to either a LeafNode, ProofNode, BranchNode, or ExtensionNode")
+
+			}
+		}
+	}
+
+	return proofPairs
 }
