@@ -6,7 +6,7 @@
    b. Implement getStrayTrieRootPath - Done.
    c. Implement getProofPairs - Done.
 4. Implement tryLoadPreState - Done.
-5. Implement tryLoadPostStateProof.
+5. Implement tryLoadPostStateProof - In Progress.
 6. Implement WasPostStateProofsValid and WasPreStateComplete.
 7. Write integration tests for the 'Generate Fraud Proof Mode' to 'Verify Fraud Proof Mode' sequence flow.
 8. Define protobuf message types for PreStateAndPostState.

@@ -61,6 +61,9 @@ type Trie struct {
 	readSet         []KVPair
 	writeList       []KVPair
 	postStateProofs PostStateProofs
+
+	// failedFraudProofReason is non-Nil only when mode == MODE_FAILED_FRAUD_PROOF.
+	failedFraudProofReason error
 }
 
 type TrieMode = uint
@@ -125,14 +128,17 @@ func NewTrie(mode TrieMode) *Trie {
 }
 
 // Get returns the value associated with key in the Trie, if it exists, and nil if does not.
-func (t *Trie) Get(key []byte) []byte {
+func (t *Trie) Get(key []byte) ([]byte, error) {
 	if t.mode == MODE_DEAD {
 		panic("attempted to use dead Trie. Read Trie documentation.")
 	}
 
 	switch true {
 	case t.mode == MODE_NORMAL:
-		return t.getNormally(key)
+		_, encounteredProofNode := t.getNormally(key)
+		if encounteredProofNode {
+			panic("unreachable code")
+		}
 	case t.mode == MODE_GENERATE_FRAUD_PROOF:
 		// 1. At this expected stage in the Trie lifecycle, writeList would not have been committed into
 		// Trie, so first, try to get from writeList.
@@ -149,11 +155,14 @@ func (t *Trie) Get(key []byte) []byte {
 		}
 		value := getFrom(t.writeList, key)
 		if value != nil {
-			return value
+			return value, nil
 		}
 
 		// 2. The key has not been updated in the writeList, so, try to get it from the Trie.
-		value = t.getNormally(key)
+		value, encounteredProofNode := t.getNormally(key)
+		if encounteredProofNode {
+			panic("unreachable code")
+		}
 		inReadSet := func(readSet []KVPair, key []byte) bool {
 			for _, kvPair := range readSet {
 				if reflect.DeepEqual(key, kvPair.key) {
@@ -167,10 +176,16 @@ func (t *Trie) Get(key []byte) []byte {
 			t.readSet = append(t.readSet, KVPair{key, value})
 		}
 
-		return value
+		return value, nil
 	case t.mode == MODE_VERIFY_FRAUD_PROOF:
 		// TODO [Alice]: differentiate between incomplete PreState and actually non-existent KV pair.
-		return t.getNormally(key)
+		value, encounteredProofNode := t.getNormally(key)
+		if encounteredProofNode {
+			t.failedFraudProofReason = fmt.Errorf("incomplete PreState")
+			t.mode = MODE_FAILED_FRAUD_PROOF
+			return nil, t.failedFraudProofReason
+		}
+		return value, nil
 	default:
 		panic("unreachable code")
 	}
@@ -190,8 +205,9 @@ func (t *Trie) Put(key []byte, value []byte) error {
 	if t.mode == MODE_VERIFY_FRAUD_PROOF {
 		if len(t.postStateProofs) == 0 {
 			// PostStateProof failure case 1: Fraudulent transaction has more mutation operations than there are postStateProofs.
+			t.failedFraudProofReason = fmt.Errorf("insufficient number of postStateProofs")
 			t.mode = MODE_FAILED_FRAUD_PROOF
-			return fmt.Errorf("insufficient number of postStateProofs")
+			return t.failedFraudProofReason
 		}
 
 		var postStateProof PostStateProof
@@ -201,6 +217,7 @@ func (t *Trie) Put(key []byte, value []byte) error {
 			// PostStateProof failure case 2: postStateProof overwrote a node it wasn't supposed to overwrite.
 			// or             failure case 3: postStateProof changed state root.
 			// or             failure case 4: postStateProof does not complete stray trie.
+			t.failedFraudProofReason = err
 			t.mode = MODE_FAILED_FRAUD_PROOF
 			return err
 		}
@@ -516,13 +533,15 @@ func (t *Trie) LoadPreAndPostState(preState PreState, postState PostStateProofs,
 
 	err := t.tryLoadPreState(preState)
 	if err != nil {
+		t.failedFraudProofReason = err
 		t.mode = MODE_FAILED_FRAUD_PROOF
 		return err
 	}
 
 	if reflect.DeepEqual(t.RootHash(), expectedPreStateHash) {
+		t.failedFraudProofReason = fmt.Errorf("RootHash after PreState insertion does not match expectedPreStateHash")
 		t.mode = MODE_FAILED_FRAUD_PROOF
-		return fmt.Errorf("t.RootHash() after PreState insertion does not match expectedPreStateHash")
+		return t.failedFraudProofReason
 	}
 
 	t.postStateProofs = postState
@@ -603,40 +622,42 @@ func (t *Trie) SaveToDB(db DB) {
 	db.Put([]byte("root"), serializeNode(t.root))
 }
 
-// WasPreStateComplete returns whether PreState was complete during fraud proof transaction execution.
-//
-// # Panics
-// This method panics if called when t.mode != MODE_VERIFY_FRAUD_PROOF
-func (t *Trie) WasPreStateComplete() bool {
-	if t.mode != MODE_VERIFY_FRAUD_PROOF {
+func (t *Trie) GetFailedFraudProofReason() error {
+	if t.mode != MODE_FAILED_FRAUD_PROOF {
 		panic("")
 	}
-	return true
+
+	if t.failedFraudProofReason == nil {
+		panic("unreachable code")
+	}
+
+	return t.failedFraudProofReason
 }
 
 ////////////////////
 // Private methods
 ////////////////////
 
-func (t *Trie) getNormally(key []byte) []byte {
+// getNormally returns an error if it encounters a ProofNode. This implies that PreState is incomplete.
+func (t *Trie) getNormally(key []byte) (value []byte, encounteredProofNode bool) {
 	node := t.root
 	nibbles := newNibbles(key)
 	for {
 		if node == nil {
-			return nil
+			return nil, false
 		}
 
 		if leaf, ok := node.(*LeafNode); ok {
 			matched := commonPrefixLength(leaf.path, nibbles)
 			if matched != len(leaf.path) || matched != len(nibbles) {
-				return nil
+				return nil, false
 			}
-			return leaf.value
+			return leaf.value, false
 		}
 
 		if branch, ok := node.(*BranchNode); ok {
 			if len(nibbles) == 0 {
-				return branch.value
+				return branch.value, false
 			}
 
 			b, remaining := nibbles[0], nibbles[1:]
@@ -647,10 +668,8 @@ func (t *Trie) getNormally(key []byte) []byte {
 
 		if ext, ok := node.(*ExtensionNode); ok {
 			matched := commonPrefixLength(ext.path, nibbles)
-			// E 01020304
-			//   010203
 			if matched < len(ext.path) {
-				return nil
+				return nil, false
 			}
 
 			nibbles = nibbles[matched:]
@@ -658,7 +677,12 @@ func (t *Trie) getNormally(key []byte) []byte {
 			continue
 		}
 
-		return nil
+		if _, ok := node.(*ProofNode); ok {
+			return nil, true
+		}
+
+		// TODO [Alice]: this is a natural place to implement WasPreStateComplete.
+		return nil, false
 	}
 }
 
@@ -925,24 +949,28 @@ func (t *Trie) tryLoadPostStateProof(postStateProof PostStateProof, putKey []byt
 		panic("")
 	}
 
-	// TODO [Alice]: check if postStateProof sufficiently completes stray trie.
-
+	// 1. Stash previous root hash.
 	rootHashBefore := t.RootHash()
 
+	// 2. Load PHPairs and proofKVPairs
 	for _, phPair := range postStateProof.phPairs {
 		err := t.putProofNode(phPair.path, phPair.hash)
 		if err != nil {
 			return err
 		}
 	}
-
 	for _, proofKVPair := range postStateProof.proofKVPairs {
 		t.Put(proofKVPair.key, proofKVPair.value)
 	}
 
+	// 3. Check if root hash is still the same after loading postStateProof.
 	if reflect.DeepEqual(t.RootHash(), rootHashBefore) {
 		return fmt.Errorf("postStateProof changes Trie root hash")
 	}
+
+	// 4. Check if postStateProof is complete: that is, the path to putKey terminates either at a LeafNode
+	// of nil.
+	// TODO [Alice]
 
 	return nil
 }
