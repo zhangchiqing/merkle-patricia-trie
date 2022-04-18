@@ -176,17 +176,38 @@ func (t *Trie) Get(key []byte) []byte {
 	}
 }
 
-/// Put adds a key value pair to the Trie.
-///
-/// # Panics
-/// This method panics if called when t.mode != MODE_NORMAL || MODE_GENERATE_FRAUD_PROOF || MODE_VERIFY_FRAUD_PROOF.
-func (t *Trie) Put(key []byte, value []byte) {
+// Put adds a key value pair to the Trie.
+//
+// # Panics
+// This method panics if called when t.mode != MODE_NORMAL || MODE_GENERATE_FRAUD_PROOF || MODE_VERIFY_FRAUD_PROOF.
+//
+// # Errors
+func (t *Trie) Put(key []byte, value []byte) error {
 	if t.mode != MODE_NORMAL && t.mode != MODE_GENERATE_FRAUD_PROOF && t.mode != MODE_VERIFY_FRAUD_PROOF {
 		panic("")
 	}
 
-	// Update writeList.
+	if t.mode == MODE_VERIFY_FRAUD_PROOF {
+		if len(t.postStateProofs) == 0 {
+			// PostStateProof failure case 1: Fraudulent transaction has more mutation operations than there are postStateProofs.
+			t.mode = MODE_FAILED_FRAUD_PROOF
+			return fmt.Errorf("insufficient number of postStateProofs")
+		}
+
+		var postStateProof PostStateProof
+		t.postStateProofs, postStateProof = t.postStateProofs[:len(t.postStateProofs)-1], t.postStateProofs[len(t.postStateProofs)-1]
+		err := t.tryLoadPostStateProof(postStateProof, key)
+		if err != nil {
+			// PostStateProof failure case 2: postStateProof overwrote a node it wasn't supposed to overwrite.
+			// or             failure case 3: postStateProof changed state root.
+			// or             failure case 4: postStateProof does not complete stray trie.
+			t.mode = MODE_FAILED_FRAUD_PROOF
+			return err
+		}
+	}
+
 	if t.mode == MODE_GENERATE_FRAUD_PROOF || t.mode == MODE_VERIFY_FRAUD_PROOF {
+		// Update writeList.
 		t.writeList = append(t.writeList, KVPair{key, value})
 	}
 
@@ -196,7 +217,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 		if *node == nil {
 			leaf := newLeafNode(remainingPath, value)
 			*node = leaf
-			return
+			return nil
 		}
 
 		switch n := (*node).(type) {
@@ -211,7 +232,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 			if lenCommonPrefix == len(remainingPath) && lenCommonPrefix == len(leaf.path) {
 				newLeaf := newLeafNode(leaf.path, value)
 				*node = newLeaf
-				return
+				return nil
 			}
 
 			branch := newBranchNode()
@@ -272,8 +293,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 				// ... -> branch
 				*node = branch
 			}
-
-			return
+			return nil
 		case *BranchNode:
 			branchNode := n
 			if len(remainingPath) == 0 {
@@ -282,7 +302,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 				// Illust.:
 				// ... -> Branch {value}
 				branchNode.setValue(value)
-				return
+				return nil
 			} else {
 				// remainingPath is still not exhausted. Recurse into the branch corresponding to the first nibble
 				// of the remainingPath.
@@ -333,7 +353,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 					// the Trie.
 					*node = branch
 				}
-				return
+				return nil
 			} else {
 				// Case 2: ext.path is a substring of remainingPath.
 				remainingPath = remainingPath[lenCommonPrefix:]
@@ -355,7 +375,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 			if len(remainingPath) == lenCommonPrefix && len(proofNode.path) == len(remainingPath) {
 				newLeaf := newLeafNode(proofNode.path, value)
 				*node = newLeaf
-				return
+				return nil
 			}
 
 			branch := newBranchNode()
@@ -384,8 +404,7 @@ func (t *Trie) Put(key []byte, value []byte) {
 			} else {
 				*node = branch
 			}
-
-			return
+			return nil
 		default:
 			panic("trie contains a node that cannot be deserialized into either a BranchNode, ExtensionNode, LeafNode, or ProofNode")
 		}
@@ -901,8 +920,31 @@ func (t *Trie) tryLoadPreState(preState PreState) error {
 }
 
 // tryLoadPostStateProof
-func (t *Trie) tryLoadPostStateProof(postStateProof PostStateProof) error {
-	panic("")
+func (t *Trie) tryLoadPostStateProof(postStateProof PostStateProof, putKey []byte) error {
+	if t.mode != MODE_VERIFY_FRAUD_PROOF {
+		panic("")
+	}
+
+	// TODO [Alice]: check if postStateProof sufficiently completes stray trie.
+
+	rootHashBefore := t.RootHash()
+
+	for _, phPair := range postStateProof.phPairs {
+		err := t.putProofNode(phPair.path, phPair.hash)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, proofKVPair := range postStateProof.proofKVPairs {
+		t.Put(proofKVPair.key, proofKVPair.value)
+	}
+
+	if reflect.DeepEqual(t.RootHash(), rootHashBefore) {
+		return fmt.Errorf("postStateProof changes Trie root hash")
+	}
+
+	return nil
 }
 
 // getStrayTrieRootPath returns newNibbles(key) if there is no stray Trie.
