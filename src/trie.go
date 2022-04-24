@@ -28,27 +28,23 @@ import (
 //    Op 1. NewTrie(mode: MODE_GENERATE_FRAUD_PROOF)
 //    Op 2. LoadFromDB()
 //    Op 3. *Get()/Put()
-//    Op 4. preState, postState = GetPreAndPostState()
+//    Op 4. preState, postStateProofs = GetPreAndPostStateProofs()
 //    Op 5. serializedPreState, serializedPostState = preState.Serialize(), postState.Serialize()
 //
 // 3. Verify fraud proof mode:
 //    Op 1. NewTrie(mode: VERIFY_FRAUD_PROOF)
-//    Op 2. preState, postState = DeserializePreState(serializedPreState),
-//                                                       DeserializePostState(serializedPostState)
+//    Op 2. preState, postStateProofs = DeserializePreState(serializedPreState),
+//                                                       DeserializePostStateProofs(serializedPostState)
 //    Op 3. preStateErr := LoadPreStateAndPostState(preState, postState)
 //	  Op 4. if preStateErr != nil
 //          then break (fraud proof unsuccessful)
 //		    else continue
-//    Op 5. stateRoot = GetStateRoot()
-//    Op 6. if stateRoot != published StateRoot before fraudulent transaction.
-//          then break (fraud proof unsuccessful)
-//          else continue
-//    Op 7. *Get/Put()
-//    Op 8. if WasPostStateProofsValid() && WasPreStateComplete()
-//          then break (fraud proof unsuccessful)
-//          else continue
-//    Op 9. stateRoot = GetStateRoot()
-//    Op 10. if stateRoot == published StateRoot after fraudulent transaction.
+//    Op 5. *Get/Put()
+//    Op 6. if FraudProofInvalid()
+//          then GetFailedFraudProofReason() (fraud proof unsuccessful)
+//		    else disable the rollup
+//    Op 7. stateRoot = GetStateRoot()
+//    Op 8. if stateRoot == published StateRoot after fraudulent transaction.
 //          then break (fraud proof unsuccessful)
 //          else disable the rollup
 //
@@ -71,9 +67,10 @@ type TrieMode = uint
 const (
 	MODE_NORMAL               TrieMode = 0
 	MODE_GENERATE_FRAUD_PROOF TrieMode = 1
-	MODE_VERIFY_FRAUD_PROOF   TrieMode = 2
-	MODE_FAILED_FRAUD_PROOF   TrieMode = 3
-	MODE_DEAD                 TrieMode = 4
+	MODE_LOAD_PRE_STATE       TrieMode = 2
+	MODE_VERIFY_FRAUD_PROOF   TrieMode = 3
+	MODE_FAILED_FRAUD_PROOF   TrieMode = 4
+	MODE_DEAD                 TrieMode = 5
 )
 
 // KVPair stands for "Key, Value Pair". KVPairs are inserted into Trie using Put.
@@ -128,17 +125,18 @@ func NewTrie(mode TrieMode) *Trie {
 }
 
 // Get returns the value associated with key in the Trie, if it exists, and nil if does not.
-func (t *Trie) Get(key []byte) ([]byte, error) {
+func (t *Trie) Get(key []byte) []byte {
 	if t.mode == MODE_DEAD {
 		panic("attempted to use dead Trie. Read Trie documentation.")
 	}
 
 	switch true {
-	case t.mode == MODE_NORMAL:
-		_, encounteredProofNode := t.getNormally(key)
+	case t.mode == MODE_NORMAL || t.mode == MODE_LOAD_PRE_STATE:
+		value, encounteredProofNode := t.getNormally(key)
 		if encounteredProofNode {
 			panic("unreachable code")
 		}
+		return value
 	case t.mode == MODE_GENERATE_FRAUD_PROOF:
 		// 1. At this expected stage in the Trie lifecycle, writeList would not have been committed into
 		// Trie, so first, try to get from writeList.
@@ -155,7 +153,7 @@ func (t *Trie) Get(key []byte) ([]byte, error) {
 		}
 		value := getFrom(t.writeList, key)
 		if value != nil {
-			return value, nil
+			return value
 		}
 
 		// 2. The key has not been updated in the writeList, so, try to get it from the Trie.
@@ -176,16 +174,16 @@ func (t *Trie) Get(key []byte) ([]byte, error) {
 			t.readSet = append(t.readSet, KVPair{key, value})
 		}
 
-		return value, nil
+		return value
 	case t.mode == MODE_VERIFY_FRAUD_PROOF:
 		// TODO [Alice]: differentiate between incomplete PreState and actually non-existent KV pair.
 		value, encounteredProofNode := t.getNormally(key)
 		if encounteredProofNode {
 			t.failedFraudProofReason = fmt.Errorf("incomplete PreState")
 			t.mode = MODE_FAILED_FRAUD_PROOF
-			return nil, t.failedFraudProofReason
+			return nil
 		}
-		return value, nil
+		return value
 	default:
 		panic("unreachable code")
 	}
@@ -223,7 +221,7 @@ func (t *Trie) Put(key []byte, value []byte) error {
 		}
 	}
 
-	if t.mode == MODE_GENERATE_FRAUD_PROOF || t.mode == MODE_VERIFY_FRAUD_PROOF {
+	if t.mode == MODE_GENERATE_FRAUD_PROOF {
 		// Update writeList.
 		t.writeList = append(t.writeList, KVPair{key, value})
 	}
@@ -388,7 +386,7 @@ func (t *Trie) Put(key []byte, value []byte) error {
 			// The cases here largely correspond to the cases in the '*LeafNode' arm, so comments are omitted for
 			// brevity.
 
-			// TODO [Alice]: this case can be further constrained to shrink PreState.
+			// TODO [Alice]: This case might be further constrained to shrink PreState.
 			if len(remainingPath) == lenCommonPrefix && len(proofNode.path) == len(remainingPath) {
 				newLeaf := newLeafNode(proofNode.path, value)
 				*node = newLeaf
@@ -526,13 +524,14 @@ func (t *Trie) GetPreStateAndPostStateProofs() (PreState, PostStateProofs) {
 ///
 /// # Panics
 ///Panics if called when t.mode != MODE_VERIFY_FRAUD_PROOF.
-func (t *Trie) LoadPreAndPostState(preState PreState, postState PostStateProofs, expectedPreStateHash []byte) (preStateError error) {
+func (t *Trie) LoadPreAndPostState(preState PreState, postStateProofs PostStateProofs, expectedPreStateHash []byte) (preStateError error) {
 	if t.mode != MODE_VERIFY_FRAUD_PROOF {
 		panic("")
 	}
 
 	err := t.tryLoadPreState(preState)
 	if err != nil {
+		// putProofNode returns an error
 		t.failedFraudProofReason = err
 		t.mode = MODE_FAILED_FRAUD_PROOF
 		return err
@@ -544,7 +543,7 @@ func (t *Trie) LoadPreAndPostState(preState PreState, postState PostStateProofs,
 		return t.failedFraudProofReason
 	}
 
-	t.postStateProofs = postState
+	t.postStateProofs = postStateProofs
 
 	return nil
 }
@@ -578,7 +577,14 @@ func (t *Trie) LoadFromDB(db DB) error {
 
 // SaveToDB saves the Trie into db. At the end of this operation, the root of
 // the Trie is stored in key "root".
+//
+// # Panics
+// panics if mode != MODE_NORMAL.
 func (t *Trie) SaveToDB(db DB) {
+	if t.mode != MODE_NORMAL {
+		panic("")
+	}
+
 	nodes := []Node{t.root}
 	currentNode := (Node)(nil)
 
@@ -701,7 +707,7 @@ func (t *Trie) getNormally(key []byte) (value []byte, encounteredProofNode bool)
 // 2. Panics if the Trie contains a node that cannot be deserialized into either a LeafNode, BranchNode, ExtensionNode,
 //    or ProofNode.
 func (t *Trie) putProofNode(path []Nibble, hash []byte) error {
-	if t.mode != MODE_VERIFY_FRAUD_PROOF {
+	if t.mode != MODE_VERIFY_FRAUD_PROOF && t.mode != MODE_LOAD_PRE_STATE {
 		panic("")
 	}
 
@@ -939,6 +945,8 @@ func (t *Trie) tryLoadPreState(preState PreState) error {
 	for _, kvPair := range preState.kvPairs {
 		t.Put(kvPair.key, kvPair.value)
 	}
+
+	t.mode = MODE_VERIFY_FRAUD_PROOF
 
 	return nil
 }

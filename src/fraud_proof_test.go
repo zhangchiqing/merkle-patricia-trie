@@ -134,17 +134,24 @@ func TestPutProofNode(t *testing.T) {
 		// Build trie2.
 		trie2 := NewTrie(MODE_VERIFY_FRAUD_PROOF)
 
+		// Create PreState
+		preState := newPreState()
+
 		// Insert read key-value pairs: leftRightLeaf.value and rightBranch.value
-		trie2.Put([]byte{00, 00, 00, 00, 01, 00, 00, 00}, leftRightLeaf.value)
-		trie2.Put([]byte{02}, rightBranch.value)
+		preState.kvPairs = append(preState.kvPairs, KVPair{key: []byte{00, 00, 00, 00, 01, 00, 00, 00}, value: leftRightLeaf.value})
+		preState.kvPairs = append(preState.kvPairs, KVPair{key: []byte{02}, value: rightBranch.value})
 
 		// Insert hashes: leftLeftLeaf.hash(), middleLeaf.hash(), rightLeftLeaf.hash(), and rightExtension.hash()
-		trie2.putProofNode(newNibbles([]byte{00, 00, 00, 00, 00}), leftLeftLeaf.hash())
-		trie2.putProofNode(newNibbles([]byte{01}), middleLeaf.hash())
-		trie2.putProofNode(newNibbles([]byte{02, 00}), rightLeftLeaf.hash())
-		trie2.putProofNode(newNibbles([]byte{02, 16}), rightExtension.hash())
+		preState.phPairs = append(preState.phPairs, PHPair{path: newNibbles([]byte{00, 00, 00, 00, 00}), hash: leftLeftLeaf.hash()})
+		preState.phPairs = append(preState.phPairs, PHPair{path: newNibbles([]byte{01}), hash: middleLeaf.hash()})
+		preState.phPairs = append(preState.phPairs, PHPair{path: newNibbles([]byte{02, 00}), hash: rightLeftLeaf.hash()})
+		preState.phPairs = append(preState.phPairs, PHPair{path: newNibbles([]byte{02, 16}), hash: rightExtension.hash()})
 
-		require.Equal(t, trie1.RootHash(), trie2.RootHash())
+		trie2.LoadPreAndPostState(
+			preState,
+			newPostStateProofs(),
+			trie1.RootHash(),
+		)
 	})
 }
 
