@@ -19,6 +19,9 @@ type Proof interface {
 
 	// Get retrieves the given key if it's present in the key-value data store.
 	Get(key []byte) ([]byte, error)
+
+	// Serialize returns the serialized proof
+	Serialize() [][]byte
 }
 
 type ProofDB struct {
@@ -56,6 +59,14 @@ func (w *ProofDB) Get(key []byte) ([]byte, error) {
 		return nil, fmt.Errorf("not found")
 	}
 	return val, nil
+}
+
+func (w *ProofDB) Serialize() [][]byte {
+	nodes := make([][]byte, 0, len(w.kv))
+	for _, value := range w.kv {
+		nodes = append(nodes, value)
+	}
+	return nodes
 }
 
 // Prove returns the merkle proof for the given key, which is
