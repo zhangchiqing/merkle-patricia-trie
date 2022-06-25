@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -25,8 +26,8 @@ func TestStorageProof(t *testing.T) {
 	accountState1, err := rlp.EncodeToBytes([]interface{}{
 		uint64(1),                     // Nonce
 		(new(big.Int)).SetInt64(1e18), // 1 ETH
-		crypto.Keccak256([]byte("")),  // Empty CodeHash
 		EmptyNodeHash,                 // Empty StorageHash
+		crypto.Keccak256([]byte("")),  // Empty CodeHash
 	})
 	require.NoError(t, err)
 
@@ -35,8 +36,8 @@ func TestStorageProof(t *testing.T) {
 	accountState2, err := rlp.EncodeToBytes([]interface{}{
 		uint64(3),                     // Nonce
 		(new(big.Int)).SetInt64(2e18), // 2 ETH
-		crypto.Keccak256([]byte("")),  // Empty CodeHash
 		EmptyNodeHash,                 // Empty StorageHash
+		crypto.Keccak256([]byte("")),  // Empty CodeHash
 	})
 	require.NoError(t, err)
 
@@ -56,6 +57,11 @@ func TestStorageProof(t *testing.T) {
 	require.True(t, ok)
 
 	serialized := accountState1Proof.Serialize()
+
+	// print the proof
+	for _, node := range serialized {
+		fmt.Println(fmt.Sprintf("proof node: %x", node))
+	}
 
 	// create a proof trie, and add each node from the serialized proof
 	proofTrie := NewProofDB()
