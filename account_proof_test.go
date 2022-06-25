@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -56,6 +57,11 @@ func TestStorageProof(t *testing.T) {
 	require.True(t, ok)
 
 	serialized := accountState1Proof.Serialize()
+
+	// print the proof
+	for _, node := range serialized {
+		fmt.Println(fmt.Sprintf("proof node: %x", node))
+	}
 
 	// create a proof trie, and add each node from the serialized proof
 	proofTrie := NewProofDB()
