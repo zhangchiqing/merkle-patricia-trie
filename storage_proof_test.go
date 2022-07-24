@@ -1,131 +1,216 @@
 package main
 
-// ~/zhangchiqing/merkle-patricia-trie on (master)
-// ▸ curl https://eth-rinkeby.alchemyapi.io/v2/pjWl_08T5sICNWNAfNfVgOe05XNElnMj \
-//   -X POST \
-//   -H "Content-Type: application/json" \
-//   -d '{"jsonrpc":"2.0","method":"eth_getStorageAt","params":["0x4f25215571FE6Bb07206c329DF37EEE6A471316E","0x0"],"id":1}' | jq .
-//
-//
-//   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-//                                  Dload  Upload   Total   Spent    Left  Speed
-// 100   216  100   102  100   114    315    352 --:--:-- --:--:-- --:--:--   351
-// {
-//   "jsonrpc": "2.0",
-//   "id": 1,
-//   "result": "0x00000000000000000000000068c80ed8e3b63ff15b20da9144bd749acc0f9ae9"
-// }
-//
-// ~/zhangchiqing/merkle-patricia-trie on (master)
-// ▸ curl https://eth-rinkeby.alchemyapi.io/v2/pjWl_08T5sICNWNAfNfVgOe05XNElnMj \
-//   -X POST \
-//   -H "Content-Type: application/json" \
-//   -d '{"jsonrpc":"2.0","method":"eth_getStorageAt","params":["0x4f25215571FE6Bb07206c329DF37EEE6A471316E","0x1"],"id":1}' | jq .
-//
-//
-//   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-//                                  Dload  Upload   Total   Spent    Left  Speed
-// 100   216  100   102  100   114    204    228 --:--:-- --:--:-- --:--:--   228
-// {
-//   "jsonrpc": "2.0",
-//   "id": 1,
-//   "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
-// }
-//
-// ~/zhangchiqing/merkle-patricia-trie on (master)
-// ▸ curl https://eth-rinkeby.alchemyapi.io/v2/pjWl_08T5sICNWNAfNfVgOe05XNElnMj \
-//   -X POST \
-//   -H "Content-Type: application/json" \
-//   -d '{"jsonrpc":"2.0","method":"eth_getStorageAt","params":["0x4f25215571FE6Bb07206c329DF37EEE6A471316E","0x2"],"id":1}' | jq .
-//
-//
-//   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-//                                  Dload  Upload   Total   Spent    Left  Speed
-// 100   216  100   102  100   114    101    113  0:00:01  0:00:01 --:--:--   114
-// {
-//   "jsonrpc": "2.0",
-//   "id": 1,
-//   "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
-// }
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"math/big"
+	"os"
+	"testing"
 
-// ~/zhangchiqing/merkle-patricia-trie on (master)
-// ▸ curl https://eth-rinkeby.alchemyapi.io/v2/pjWl_08T5sICNWNAfNfVgOe05XNElnMj \
-//   -X POST \
-//   -H "Content-Type: application/json" \
-//   -d '{"jsonrpc":"2.0","method":"eth_getProof","params":["0x4f25215571FE6Bb07206c329DF37EEE6A471316E",["0x0"], "0xA8894B"],"id":1}' | jq .
-//
-//
-//   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-//                                  Dload  Upload   Total   Spent    Left  Speed
-// 100  7412  100  7288  100   124  20555    349 --:--:-- --:--:-- --:--:-- 20587
-// {
-//   "jsonrpc": "2.0",
-//   "id": 1,
-//   "result": {
-//     "address": "0x4f25215571fe6bb07206c329df37eee6a471316e",
-//     "accountProof": [
-//       "0xf90211a098aff968a4e643d7c05e0d961fd63a08dccf2c9f39ce8f8e8ba5203798de4f9ea08ea8958ee7e17966b9e03522210277c0f76a8f4614c9a53bd4def9d31c9e165da0e2a2fccda8d12d52a01b603452ab6dedc305fa481f79dea55b91b79fe56bb835a0e6f22d4f4e864d7244ece2072e9f5a20b38035b850480cd378db8d22189bf5f3a02a028626fb02dbd14636328b398e83810b2a3e2df2a1a72235dffba87b0087f3a0764e33f42bb44070bc5994270110cb22133bb969c9b9ad93cebade1dee56f482a01f6bf3d1e207b16cff2ff006289394a4bfe6a5de297bb61cd373f085b676a644a0fb46429cb3ba37003c733796e61e29774a4fc0da1a721c8a64c82ef6f62d2c61a0a8c49a203bfd3d968bb46416704b20fa60dd1bf8aa3fa20033a6adf7e329cc45a0d216186d9cdd5287aa5faa88bd883e832b297a10916fb992605ef14618d0493da0782dc1814f22c7ed5621e4b58e206d1fe1474c4f38da20abd5d0531f13c5d305a03a69d92841034ae344832dd72adc1b638469381999be2090a394668dff4a9855a08302ac639e99b55bf087d694d2f2e0b1c7106b2c288809757d223fb5212f8c13a0ec90a4d077100efbaa8c2ebf1e73c93dde65ea5ffb2a353aba26b15b07a78a4aa048445e95286b0d0eb240e77a3bcf3fdf57c0b61905ec52fa4e5237638e9c675ca0cef71e4442b60ecec0bfd5e5037b30d3ac53a31eba9d902a7809516712084b5580",
-//       "0xf90211a09dcacb400bd83f1d0b5e59daf72c6a2c1df271df0d40c15e0f2b1e2d316af9bca04dd3dde4a9edf29856300e25bcb08c8edaa7f7d67ba60a2901d2802d38039234a0b23802a5fd41adc9c92348ecf083c298e30fb74e2305357fdeacbf58c8b34a27a0a0baa52b81ccd59955e6ca9a15348c3a60d186f1cbaebc75cae024c5bb024919a04f5b470ae2cec8cd3535813d17737d807a4d6c6f4d0eb8010b13a57697df9d55a0e72ea4ba4686f8b3472c5d6c84207f84f2f545f5aa5df95a07d7f173bb3e84e4a0c575efa929c269ce922b093763c4677867a4413b0ab78db844c816a70db5f41ba02167f9a4a65ea3aa620b6b95fa85803fe1d82f3267516fd445824dd28fa3d808a014c8f467ccde462e60d7bf86a82a68283e1b178833fd05f425156bc341d6d4dda072624b5fec1d5b38e045115ac183234179d0de94c077d4840160a7b9b00e1f95a01195011b6d5e8b75d1c49008e57b70f1aa373dde8eef0e182ad1716a791cbf75a06afef5b44d0f384760f4eada5a90f7f07bae54c362deaf9cc2f8e9744ade3f22a06bc60c532171ce66dd6572e1359bbc35c539a77b638c2de63c5c2615fc5412e2a03186141aad0e27d0daa9c550bff426889f246c43f3bbe28c6628d9ca2c0fab15a0290af971e2ec571df6527a57096984895552006bdf4031043f4df4416c313ecea096c7296594302108516398d90cad2067dce6ee1a16786429d8ca268ff84ec47980",
-//       "0xf90211a05b6172fb8f797cd9c23d2ec9decdcf24da18e2ae47f3b65d3a6185cc82e9035ea0d30314e365958e77e37e7bf455493a69c6df9c47e79032e62dfc718d356adec0a0953029c6c4416c8ebd1c8e3a343ecc9efd976250c2c5e29551370ab7166368e7a07fbaa982321237d6203b468a69bf1862ce877ac5fdd5a8ab096a863bec8a2c18a06c3ad432fe921289371c282fe1a3140b7cb23e0e14d3076bc350900dbf7b80f7a031ee800f3fb00dc3fa74755206ee525d6c3fac3721e6ee8fe0b0878cf7b484e8a08e67d2ad7329393b5ba270e76dba47f7ec4b4deb7baa04583a5e993e258effe4a08a84215e2c4749199c43db279251535eff863dd431fad50348337e82b4b89103a0c6da94106051eb1ab66b6f87d7e0a8453421a7b1b6797aa677a4bc7ac7ece857a0860129fa0d995d70b10ef41e6182e2607775634955976bb8c7089737fd651cb0a0cb03a2f56eeec37291bde11e4903a3b7ef36c61669b7f8347c0594d453be127ca08af51fc0dbbf1e295d4e01fe1a45b765a0000b45601c35f84b1a372d893bb4dba0a234fda22a7434cd1b903670b63b3c79f55703f9c4c5fb44d19d4edeebc65e88a06b9b770fd339d283161af7f4499108185e6ae3b69ccadc4fb6c70f74ac921493a05118082ece9c9a7a1d37c35ae86811365a3bb4820c01461a4a6ca88309eaef4fa0b080d65cfd69c92c8c50cf1b3ecc1745894b4fdcb817c81957c45066a33406ba80",
-//       "0xf90211a0668ad662c32c5e203476dc1166c497a950c23c2be5716372c0401f3593617556a066355bee45b403fc0fbcf2625bcdc92fda1ec46d6cbd1f650545b89994b4ccdda06fd1915d09b437779b94dc72e5387389bb9111195a41d49b40787cc3f040f2b1a004bb04adf02e8322e94451bfdc2d312131ce16909c6f98253da1b5dfd19af899a096b0a5b0f62399a1d72d7059491837752e23f64ddbc54fbf39bb86f043897059a0dee005493751e9b82283934237cfc87c850c44eb2ffccc40490a6fb0649ffb37a0a04a90de81ebc34e56f99021db04b7a750bc341a6d433e8575e5ada25f377502a0f7f6dda133a8b8223064d915805e91ec0975e2abc1d4d94a870df2941144a22aa00ffeb8713cdedcab625915f818915374b8f40a02f48799266741447cccc47ca6a0171639e8fa16daeb17a624950fb7bd2dd054ea1633505bf9da9f4f7e148e7bb3a0bf04c2fae8c090ce5d1a7d1080667aeeb719e45502755e7a23c46b1e609b0302a09097299ae45a6f70caa8115cfe2e50142a9887b4742d518b1d9b307ac8986ccca06a9d1e8a8d06e514a4742df11e8fa9b9f33c37a7672f0c212209e98a73d03926a0dd9a28061aed24991ea1b0bad237699545461a30a321ce795df376c1d9f1c388a0514dc258bfa325e0833629b04bb47e8cfb1a073833a605b83b1936a2c54cff07a04354ae4aafc722708852918649549faa8da21ec7a912ae8d71c150774d102eb780",
-//       "0xf90211a0d8fb1fa5be0ae9b2d3f045503380c467e76092986a1e379a6fccc83be952c45ea036dec600c85bc152badc135baec100f1cb7756a7eb6a8ef15cbdaf5fb80e6f59a0110b73055432784a6293205da3287df4175a92e78011279ca927198014f28859a0b0da26a3a0a411dcd0365fe3a5787ab58b636c5268134d912d1b43eb5ec515d6a0611332ea3b7bbed2856f793e0f3151e75407d08bb4e1c2eaee248b68c8a8877ba023fe70c2952f4905443ab5a1ff66c5a7330da294d2af2e68e102d16b5cf7f907a0153d6f5092722e76c97dcdfce4556a4e7b63f4f899f2a07f4b7fa549233229fba01d36812a955ddf1d0cc4f67e0fd313d6baaa4e3c2ade733089793da217c7bc23a04d48d698d408be104fb3940f0a49ed40d28b7b7b69b97d57ffff6cd53bddadc8a08233d283e4fe025e6eef47e5142884f6625edf4efeaca6d90b013bfa70a1bb8ca06fc2be5eed0fcce83131c3b92a4ea918c8bbf7953aa1ed684a524972dc00d6c1a043b90958c37dcee2ede87ba30384ab1cc7a8b3c038e1bdd6f778f0cbd3107af7a0b1eada7fc1cadb4f9e3615f91b5ccd96a7ff03611927937a36fefefedd9756e8a0254e31fe7e0e7616686b1c794414f467745494e62a8af421b29fe639f115ace7a0d03cb3c5889ce5c2ab92c40e9efdf7aede4aa880903a219d81109e3e6b97bb79a0c81a7cd5cbcc3fd1c7b6b992d7e2d9bedd831384d641570763b7a6f40f38957380",
-//       "0xf901b1a0c62908a356428940ad6dcfe5d0766a76ad8be127293de4b847bf88858916ecd8a09f3a72d6b2d17668d2fab45a5ffdd7ba302ac9855f641ea7560d5e32813cc74c80a0d32e9f724eefb60a63fc5ca860e1a84c0bcd9aebba747a3cbf410b6e7adedf3ca021b46224f03752c97a2e80b681bab5f8d2ac7902f2bf0f7a7fd98b2e164e35a18080a029ce81caf4ebdcaa5d2e9ff201717d9fbd1a08baba7be2d72371c498c0be146ca0383c00b94fb30c0b49f6be469e1911a4d0d1c205ad805770086dc1426e15be4ca0072ef32f9fb7abdd1c762c7200e18246814ebb4124ef43c0ab95cb6aa61dd75ea00984d6e9abfcfb8f7008e37f8d117ad684c9550ac9037812c1ddf024fdc8489ea0bc96ecd3a62752b9ab3a0f7131a5187f7d8fb8e9c2a65d30bd9c0a4d9c74eb61a03562506ec011345e28e9a7a8d1ce846a19cb632c503bd9172c22969df7acfdaaa048691723484cdb33f3c7cc3ccaf71354877478616eab707b3c66164adcf2c3d4a077a9a033ffc583f83f60a5ec580eca2aef10db719766f5ef16a78b6b32fc70c1a01ad4c1d9203a394a878d94b0c4e19aaa25ce66bbfe6defddd40ea8ac77b7886480",
-//       "0xf851808080808080808080808080a0bdc408f5c3d8ed013199683c63334182d2821fc7f4d63600974be280269096aca0c2493d2ba716f4e093f10e9279b1f45244870088e87731f5a7105ca80a29a513808080",
-//       "0xf8669d3957e0fa7575e905d6c5d1ddae204360ff6cbac36974eaa75f817edbc8b846f8440180a01e155bad7ce2e2a255022811299b02022144879df5b811646a186845697667cda0bc505774b591bf8a691da06f8320c00cbe4f54bddf26fa403d00501b64d666e9"
-//     ],
-//     "balance": "0x0",
-//     "codeHash": "0xbc505774b591bf8a691da06f8320c00cbe4f54bddf26fa403d00501b64d666e9",
-//     "nonce": "0x1",
-//     "storageHash": "0x1e155bad7ce2e2a255022811299b02022144879df5b811646a186845697667cd",
-//     "storageProof": [
-//       {
-//         "key": "0x0",
-//         "value": "0x68c80ed8e3b63ff15b20da9144bd749acc0f9ae9",
-//         "proof": [
-//           "0xf8518080a07351e0b89eb0e0cb1ceb73014234b718dfc95dbe0c18a9df41162f9bd360edcd8080808080808080a0f4984a11f61a2921456141df88de6e1a710d28681b91af794c5a721e47839cd78080808080",
-//           "0xf7a0390decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563959468c80ed8e3b63ff15b20da9144bd749acc0f9ae9"
-//         ]
-//       }
-//     ]
-//   }
-// }
-//
-// ~/zhangchiqing/merkle-patricia-trie on (master)
-// ▸ curl https://eth-rinkeby.alchemyapi.io/v2/pjWl_08T5sICNWNAfNfVgOe05XNElnMj \
-//   -X POST \
-//   -H "Content-Type: application/json" \
-//   -d '{"jsonrpc":"2.0","method":"eth_getProof","params":["0x4f25215571FE6Bb07206c329DF37EEE6A471316E",["0x1"], "0xA8894B"],"id":1}' | jq .
-//   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-//                                  Dload  Upload   Total   Spent    Left  Speed
-// 100  7331  100  7207  100   124  21181    364 --:--:-- --:--:-- --:--:-- 21134
-// {
-//   "jsonrpc": "2.0",
-//   "id": 1,
-//   "result": {
-//     "address": "0x4f25215571fe6bb07206c329df37eee6a471316e",
-//     "accountProof": [
-//       "0xf90211a098aff968a4e643d7c05e0d961fd63a08dccf2c9f39ce8f8e8ba5203798de4f9ea08ea8958ee7e17966b9e03522210277c0f76a8f4614c9a53bd4def9d31c9e165da0e2a2fccda8d12d52a01b603452ab6dedc305fa481f79dea55b91b79fe56bb835a0e6f22d4f4e864d7244ece2072e9f5a20b38035b850480cd378db8d22189bf5f3a02a028626fb02dbd14636328b398e83810b2a3e2df2a1a72235dffba87b0087f3a0764e33f42bb44070bc5994270110cb22133bb969c9b9ad93cebade1dee56f482a01f6bf3d1e207b16cff2ff006289394a4bfe6a5de297bb61cd373f085b676a644a0fb46429cb3ba37003c733796e61e29774a4fc0da1a721c8a64c82ef6f62d2c61a0a8c49a203bfd3d968bb46416704b20fa60dd1bf8aa3fa20033a6adf7e329cc45a0d216186d9cdd5287aa5faa88bd883e832b297a10916fb992605ef14618d0493da0782dc1814f22c7ed5621e4b58e206d1fe1474c4f38da20abd5d0531f13c5d305a03a69d92841034ae344832dd72adc1b638469381999be2090a394668dff4a9855a08302ac639e99b55bf087d694d2f2e0b1c7106b2c288809757d223fb5212f8c13a0ec90a4d077100efbaa8c2ebf1e73c93dde65ea5ffb2a353aba26b15b07a78a4aa048445e95286b0d0eb240e77a3bcf3fdf57c0b61905ec52fa4e5237638e9c675ca0cef71e4442b60ecec0bfd5e5037b30d3ac53a31eba9d902a7809516712084b5580",
-//       "0xf90211a09dcacb400bd83f1d0b5e59daf72c6a2c1df271df0d40c15e0f2b1e2d316af9bca04dd3dde4a9edf29856300e25bcb08c8edaa7f7d67ba60a2901d2802d38039234a0b23802a5fd41adc9c92348ecf083c298e30fb74e2305357fdeacbf58c8b34a27a0a0baa52b81ccd59955e6ca9a15348c3a60d186f1cbaebc75cae024c5bb024919a04f5b470ae2cec8cd3535813d17737d807a4d6c6f4d0eb8010b13a57697df9d55a0e72ea4ba4686f8b3472c5d6c84207f84f2f545f5aa5df95a07d7f173bb3e84e4a0c575efa929c269ce922b093763c4677867a4413b0ab78db844c816a70db5f41ba02167f9a4a65ea3aa620b6b95fa85803fe1d82f3267516fd445824dd28fa3d808a014c8f467ccde462e60d7bf86a82a68283e1b178833fd05f425156bc341d6d4dda072624b5fec1d5b38e045115ac183234179d0de94c077d4840160a7b9b00e1f95a01195011b6d5e8b75d1c49008e57b70f1aa373dde8eef0e182ad1716a791cbf75a06afef5b44d0f384760f4eada5a90f7f07bae54c362deaf9cc2f8e9744ade3f22a06bc60c532171ce66dd6572e1359bbc35c539a77b638c2de63c5c2615fc5412e2a03186141aad0e27d0daa9c550bff426889f246c43f3bbe28c6628d9ca2c0fab15a0290af971e2ec571df6527a57096984895552006bdf4031043f4df4416c313ecea096c7296594302108516398d90cad2067dce6ee1a16786429d8ca268ff84ec47980",
-//       "0xf90211a05b6172fb8f797cd9c23d2ec9decdcf24da18e2ae47f3b65d3a6185cc82e9035ea0d30314e365958e77e37e7bf455493a69c6df9c47e79032e62dfc718d356adec0a0953029c6c4416c8ebd1c8e3a343ecc9efd976250c2c5e29551370ab7166368e7a07fbaa982321237d6203b468a69bf1862ce877ac5fdd5a8ab096a863bec8a2c18a06c3ad432fe921289371c282fe1a3140b7cb23e0e14d3076bc350900dbf7b80f7a031ee800f3fb00dc3fa74755206ee525d6c3fac3721e6ee8fe0b0878cf7b484e8a08e67d2ad7329393b5ba270e76dba47f7ec4b4deb7baa04583a5e993e258effe4a08a84215e2c4749199c43db279251535eff863dd431fad50348337e82b4b89103a0c6da94106051eb1ab66b6f87d7e0a8453421a7b1b6797aa677a4bc7ac7ece857a0860129fa0d995d70b10ef41e6182e2607775634955976bb8c7089737fd651cb0a0cb03a2f56eeec37291bde11e4903a3b7ef36c61669b7f8347c0594d453be127ca08af51fc0dbbf1e295d4e01fe1a45b765a0000b45601c35f84b1a372d893bb4dba0a234fda22a7434cd1b903670b63b3c79f55703f9c4c5fb44d19d4edeebc65e88a06b9b770fd339d283161af7f4499108185e6ae3b69ccadc4fb6c70f74ac921493a05118082ece9c9a7a1d37c35ae86811365a3bb4820c01461a4a6ca88309eaef4fa0b080d65cfd69c92c8c50cf1b3ecc1745894b4fdcb817c81957c45066a33406ba80",
-//       "0xf90211a0668ad662c32c5e203476dc1166c497a950c23c2be5716372c0401f3593617556a066355bee45b403fc0fbcf2625bcdc92fda1ec46d6cbd1f650545b89994b4ccdda06fd1915d09b437779b94dc72e5387389bb9111195a41d49b40787cc3f040f2b1a004bb04adf02e8322e94451bfdc2d312131ce16909c6f98253da1b5dfd19af899a096b0a5b0f62399a1d72d7059491837752e23f64ddbc54fbf39bb86f043897059a0dee005493751e9b82283934237cfc87c850c44eb2ffccc40490a6fb0649ffb37a0a04a90de81ebc34e56f99021db04b7a750bc341a6d433e8575e5ada25f377502a0f7f6dda133a8b8223064d915805e91ec0975e2abc1d4d94a870df2941144a22aa00ffeb8713cdedcab625915f818915374b8f40a02f48799266741447cccc47ca6a0171639e8fa16daeb17a624950fb7bd2dd054ea1633505bf9da9f4f7e148e7bb3a0bf04c2fae8c090ce5d1a7d1080667aeeb719e45502755e7a23c46b1e609b0302a09097299ae45a6f70caa8115cfe2e50142a9887b4742d518b1d9b307ac8986ccca06a9d1e8a8d06e514a4742df11e8fa9b9f33c37a7672f0c212209e98a73d03926a0dd9a28061aed24991ea1b0bad237699545461a30a321ce795df376c1d9f1c388a0514dc258bfa325e0833629b04bb47e8cfb1a073833a605b83b1936a2c54cff07a04354ae4aafc722708852918649549faa8da21ec7a912ae8d71c150774d102eb780",
-//       "0xf90211a0d8fb1fa5be0ae9b2d3f045503380c467e76092986a1e379a6fccc83be952c45ea036dec600c85bc152badc135baec100f1cb7756a7eb6a8ef15cbdaf5fb80e6f59a0110b73055432784a6293205da3287df4175a92e78011279ca927198014f28859a0b0da26a3a0a411dcd0365fe3a5787ab58b636c5268134d912d1b43eb5ec515d6a0611332ea3b7bbed2856f793e0f3151e75407d08bb4e1c2eaee248b68c8a8877ba023fe70c2952f4905443ab5a1ff66c5a7330da294d2af2e68e102d16b5cf7f907a0153d6f5092722e76c97dcdfce4556a4e7b63f4f899f2a07f4b7fa549233229fba01d36812a955ddf1d0cc4f67e0fd313d6baaa4e3c2ade733089793da217c7bc23a04d48d698d408be104fb3940f0a49ed40d28b7b7b69b97d57ffff6cd53bddadc8a08233d283e4fe025e6eef47e5142884f6625edf4efeaca6d90b013bfa70a1bb8ca06fc2be5eed0fcce83131c3b92a4ea918c8bbf7953aa1ed684a524972dc00d6c1a043b90958c37dcee2ede87ba30384ab1cc7a8b3c038e1bdd6f778f0cbd3107af7a0b1eada7fc1cadb4f9e3615f91b5ccd96a7ff03611927937a36fefefedd9756e8a0254e31fe7e0e7616686b1c794414f467745494e62a8af421b29fe639f115ace7a0d03cb3c5889ce5c2ab92c40e9efdf7aede4aa880903a219d81109e3e6b97bb79a0c81a7cd5cbcc3fd1c7b6b992d7e2d9bedd831384d641570763b7a6f40f38957380",
-//       "0xf901b1a0c62908a356428940ad6dcfe5d0766a76ad8be127293de4b847bf88858916ecd8a09f3a72d6b2d17668d2fab45a5ffdd7ba302ac9855f641ea7560d5e32813cc74c80a0d32e9f724eefb60a63fc5ca860e1a84c0bcd9aebba747a3cbf410b6e7adedf3ca021b46224f03752c97a2e80b681bab5f8d2ac7902f2bf0f7a7fd98b2e164e35a18080a029ce81caf4ebdcaa5d2e9ff201717d9fbd1a08baba7be2d72371c498c0be146ca0383c00b94fb30c0b49f6be469e1911a4d0d1c205ad805770086dc1426e15be4ca0072ef32f9fb7abdd1c762c7200e18246814ebb4124ef43c0ab95cb6aa61dd75ea00984d6e9abfcfb8f7008e37f8d117ad684c9550ac9037812c1ddf024fdc8489ea0bc96ecd3a62752b9ab3a0f7131a5187f7d8fb8e9c2a65d30bd9c0a4d9c74eb61a03562506ec011345e28e9a7a8d1ce846a19cb632c503bd9172c22969df7acfdaaa048691723484cdb33f3c7cc3ccaf71354877478616eab707b3c66164adcf2c3d4a077a9a033ffc583f83f60a5ec580eca2aef10db719766f5ef16a78b6b32fc70c1a01ad4c1d9203a394a878d94b0c4e19aaa25ce66bbfe6defddd40ea8ac77b7886480",
-//       "0xf851808080808080808080808080a0bdc408f5c3d8ed013199683c63334182d2821fc7f4d63600974be280269096aca0c2493d2ba716f4e093f10e9279b1f45244870088e87731f5a7105ca80a29a513808080",
-//       "0xf8669d3957e0fa7575e905d6c5d1ddae204360ff6cbac36974eaa75f817edbc8b846f8440180a01e155bad7ce2e2a255022811299b02022144879df5b811646a186845697667cda0bc505774b591bf8a691da06f8320c00cbe4f54bddf26fa403d00501b64d666e9"
-//     ],
-//     "balance": "0x0",
-//     "codeHash": "0xbc505774b591bf8a691da06f8320c00cbe4f54bddf26fa403d00501b64d666e9",
-//     "nonce": "0x1",
-//     "storageHash": "0x1e155bad7ce2e2a255022811299b02022144879df5b811646a186845697667cd",
-//     "storageProof": [
-//       {
-//         "key": "0x1",
-//         "value": "0x1",
-//         "proof": [
-//           "0xf8518080a07351e0b89eb0e0cb1ceb73014234b718dfc95dbe0c18a9df41162f9bd360edcd8080808080808080a0f4984a11f61a2921456141df88de6e1a710d28681b91af794c5a721e47839cd78080808080",
-//           "0xe2a0310e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf601"
-//         ]
-//       }
-//     ]
-//   }
-// }
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/stretchr/testify/require"
+)
+
+type StorageStateResult struct {
+	Nonce        hexutil.Uint64  `json:"nonce"`
+	Balance      *hexutil.Big    `json:"balance"`
+	StorageHash  common.Hash     `json:"storageHash"`
+	CodeHash     common.Hash     `json:"codeHash"`
+	StorageProof []StorageProof  `json:"storageProof"`
+	AccountProof []hexutil.Bytes `json:"accountProof"`
+}
+
+type StorageProof struct {
+	Key   HexNibbles      `json:"key"`
+	Value HexNibbles      `json:"value"`
+	Proof []hexutil.Bytes `json:"proof"`
+}
+
+type HexNibbles []byte
+
+func (n HexNibbles) MarshalText() ([]byte, error) {
+	return []byte(fmt.Sprintf("0x%v",
+		new(big.Int).SetBytes(n).Text(16))), nil
+}
+
+func (n *HexNibbles) UnmarshalText(input []byte) error {
+	input = bytes.TrimPrefix(input, []byte("0x"))
+	v, ok := new(big.Int).SetString(string(input), 16)
+	if !ok {
+		return fmt.Errorf("invalid hex input")
+	}
+	*n = v.Bytes()
+	return nil
+}
+
+type EthGetProofResponse struct {
+	Result StorageStateResult `json:"result"`
+}
+
+func TestStorageTrie(t *testing.T) {
+	// slot index
+	slot0 := common.FromHex("0x0000000000000000000000000000000000000000000000000000000000000000") // 0x290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563
+	slot1 := common.FromHex("0x0000000000000000000000000000000000000000000000000000000000000001") // 0xb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6
+
+	// encode values to be stored
+	ownerAddress, err := rlp.EncodeToBytes(common.FromHex("0xde74da73d5102a796559933296c73e7d1c6f37fb"))
+	require.NoError(t, err)
+
+	lastCompletedMigration, err := rlp.EncodeToBytes(common.FromHex("0x02"))
+	require.NoError(t, err)
+
+	// create a trie and store the key-value pairs, the key needs to be hashed
+	trie := NewTrie()
+	trie.Put(crypto.Keccak256(slot0), ownerAddress)
+	trie.Put(crypto.Keccak256(slot1), lastCompletedMigration)
+
+	// compute the root hash and check if consistent with the storage hash of contract 0xcca577ee56d30a444c73f8fc8d5ce34ed1c7da8b
+	rootHash := trie.Hash()
+	storageHash := common.FromHex("0x7317ebbe7d6c43dd6944ed0e2c5f79762113cb75fa0bed7124377c0814737fb4")
+	require.Equal(t, storageHash, rootHash)
+}
+
+func TestContractStateProof(t *testing.T) {
+	// curl https://eth-mainnet.g.alchemy.com/v2/<API_KEY> \
+	//       -X POST \
+	//       -H "Content-Type: application/json" \
+	//       -d '{"jsonrpc":"2.0","method":"eth_getProof","params":["0xcca577ee56d30a444c73f8fc8d5ce34ed1c7da8b",["0x0"], "0xA8894B"],"id":1}'
+
+	jsonFile, err := os.Open("storage_proof_slot_0.json")
+	require.NoError(t, err)
+
+	defer jsonFile.Close()
+
+	byteValue, err := ioutil.ReadAll(jsonFile)
+	require.NoError(t, err)
+
+	// load into the struct
+	var response EthGetProofResponse
+	err = json.Unmarshal(byteValue, &response)
+	require.NoError(t, err)
+
+	result := response.Result
+
+	account := common.HexToAddress("0xcca577ee56d30a444c73f8fc8d5ce34ed1c7da8b")
+	fmt.Println(fmt.Sprintf("decoded account state data from untrusted source for address %x: balance is %x, nonce is %x, codeHash: %x, storageHash: %x",
+		account, result.Balance, result.Nonce, result.CodeHash, result.StorageHash))
+
+	// get the state root hash from etherscan: https://etherscan.io/block/11045195
+	stateRootHash := common.HexToHash("0x8c571da4c95e212e508c98a50c2640214d23f66e9a591523df6140fd8d113f29")
+
+	// create a proof trie, and add each node from the account proof
+	proofTrie := NewProofDB()
+	for _, node := range result.AccountProof {
+		proofTrie.Put(crypto.Keccak256(node), node)
+	}
+
+	// verify the proof against the stateRootHash
+	validAccountState, err := VerifyProof(
+		stateRootHash.Bytes(), crypto.Keccak256(account.Bytes()), proofTrie)
+	require.NoError(t, err)
+
+	// double check the account state is identical with the account state in the result.
+	accountState, err := rlp.EncodeToBytes([]interface{}{
+		result.Nonce,
+		result.Balance.ToInt(),
+		result.StorageHash,
+		result.CodeHash,
+	})
+	require.NoError(t, err)
+	require.True(t, bytes.Equal(validAccountState, accountState), fmt.Sprintf("%x!=%x", validAccountState, accountState))
+
+	// now we can trust the data in StorageStateResult
+}
+
+func TestContractStorageProofSlot0(t *testing.T) {
+	// curl https://eth-mainnet.g.alchemy.com/v2/<API_KEY> \
+	//       -X POST \
+	//       -H "Content-Type: application/json" \
+	//       -d '{"jsonrpc":"2.0","method":"eth_getProof","params":["0xcca577ee56d30a444c73f8fc8d5ce34ed1c7da8b",["0x0"], "0xA8894B"],"id":1}'
+
+	// Read storage proof
+	jsonFile, err := os.Open("storage_proof_slot_0.json")
+	require.NoError(t, err)
+
+	defer jsonFile.Close()
+
+	byteValue, err := ioutil.ReadAll(jsonFile)
+	require.NoError(t, err)
+
+	// parse the proof
+	var response EthGetProofResponse
+	err = json.Unmarshal(byteValue, &response)
+	require.NoError(t, err)
+
+	result := response.Result
+
+	// the storage hash and the proof is the data to be verified
+	storageHash := result.StorageHash
+	storageProof := result.StorageProof[0]
+
+	// encode the key-value pair
+	key := common.LeftPadBytes(storageProof.Key, 32)
+	value, err := rlp.EncodeToBytes(storageProof.Value)
+	require.NoError(t, err)
+
+	// build a trie with the nodes in the proof
+	proofTrie := NewProofDB()
+	for _, node := range storageProof.Proof {
+		proofTrie.Put(crypto.Keccak256(node), node)
+	}
+
+	// verify the proof
+	verified, err := VerifyProof(
+		storageHash.Bytes(), crypto.Keccak256(key), proofTrie)
+	require.NoError(t, err)
+
+	// confirm the value from the proof is consistent with the reported value
+	require.True(t, bytes.Equal(verified, value), fmt.Sprintf("%x != %x", verified, value))
+}
+
+func TestContractStorageProofSlot1(t *testing.T) {
+	// curl https://eth-mainnet.g.alchemy.com/v2/<API_KEY> \
+	//       -X POST \
+	//       -H "Content-Type: application/json" \
+	//       -d '{"jsonrpc":"2.0","method":"eth_getProof","params":["0xcca577ee56d30a444c73f8fc8d5ce34ed1c7da8b",["0x1"], "0xA8894B"],"id":1}'
+
+	jsonFile, err := os.Open("storage_proof_slot_1.json")
+	require.NoError(t, err)
+
+	defer jsonFile.Close()
+
+	byteValue, err := ioutil.ReadAll(jsonFile)
+	require.NoError(t, err)
+
+	fmt.Println("loaded eip1186_proof")
+
+	// load into the struct
+	var response EthGetProofResponse
+	err = json.Unmarshal(byteValue, &response)
+	require.NoError(t, err)
+
+	result := response.Result
+
+	storageHash := result.StorageHash
+	storageProof := result.StorageProof[0]
+	value, err := rlp.EncodeToBytes(storageProof.Value)
+	require.NoError(t, err)
+	// 0x0000000000000000000000000000000000000000000000000000000000000000
+	key := common.LeftPadBytes(storageProof.Key, 32)
+
+	proofTrie := NewProofDB()
+	for _, node := range storageProof.Proof {
+		proofTrie.Put(crypto.Keccak256(node), node)
+	}
+
+	verified, err := VerifyProof(
+		storageHash.Bytes(), crypto.Keccak256(key), proofTrie)
+
+	require.NoError(t, err)
+	require.True(t, bytes.Equal(verified, value), fmt.Sprintf("%x != %x", verified, value))
+}
