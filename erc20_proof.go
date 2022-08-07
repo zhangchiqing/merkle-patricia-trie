@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-func GetSlotForMapKey(slotIndexForMap int, keyInMap []byte) [32]byte {
+func GetSlotForMapKey(keyInMap []byte, slotIndexForMap int) [32]byte {
 	return crypto.Keccak256Hash(
 		keyInMap,
 		common.LeftPadBytes(big.NewInt(int64(slotIndexForMap)).Bytes(), 32),
@@ -15,5 +15,15 @@ func GetSlotForMapKey(slotIndexForMap int, keyInMap []byte) [32]byte {
 }
 
 func GetSlotForERC20TokenHolder(slotIndexForHoldersMap int, tokenHolder common.Address) [32]byte {
-	return GetSlotForMapKey(slotIndexForHoldersMap, common.LeftPadBytes(tokenHolder[:], 32))
+	return GetSlotForMapKey(common.LeftPadBytes(tokenHolder[:], 32), slotIndexForHoldersMap)
+}
+
+func GetSlotForArrayItem(slotIndexForArray int, indexInArray int) [32]byte {
+	bytes := crypto.Keccak256Hash(common.LeftPadBytes(big.NewInt(int64(slotIndexForArray)).Bytes(), 32))
+	arrayPos := new(big.Int).SetBytes(bytes[:])
+	itemPos := arrayPos.Add(arrayPos, big.NewInt(int64(indexInArray*2)))
+	var pos [32]byte
+	copy(pos[:], itemPos.Bytes()[:32])
+
+	return pos
 }
