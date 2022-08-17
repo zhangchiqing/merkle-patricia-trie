@@ -13,7 +13,7 @@ import (
 )
 
 func GetKittySlot(slotIndexForKitties int, kittyID int) [32]byte {
-	return GetSlotForArrayItem(slotIndexForKitties, kittyID)
+	return GetSlotForArrayItem(slotIndexForKitties, kittyID, 2)
 }
 
 func TestKittiesProof(t *testing.T) {
@@ -48,7 +48,7 @@ func TestKittiesProof(t *testing.T) {
 	// sireId   uint256 :  0
 	// generation   uint256 :  0
 	// genes   uint256 :  626837621154801616088980922659877168609154386318304496692374110716999053
-	kitty1Slot := GetSlotForArrayItem(slotIndexForKitties, 1)
+	kitty1Slot := GetSlotForArrayItem(slotIndexForKitties, 1, 2)
 
 	kitty1GenesProof, err := RequestEthGetProof(
 		ckContractAddress,

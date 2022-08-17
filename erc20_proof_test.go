@@ -59,8 +59,8 @@ func VerifyStorageProof(result *StorageStateResult) error {
 }
 
 func FindBalanceForERC20TokenHolder(contractAddress common.Address, tokenHolder common.Address, blockNumber uint64) (int, *StorageStateResult, error) {
-	// for i := 0; i < 20; i++ {
-	for i := 8; i < 10; i++ {
+	// iterate through each slot index until found some data stored in the computed location
+	for i := 0; i < 20; i++ {
 		result, err := FindBalanceForERC20TokenHolderAtSlot(contractAddress, tokenHolder, blockNumber, i)
 		if err != nil {
 			return 0, nil, err
