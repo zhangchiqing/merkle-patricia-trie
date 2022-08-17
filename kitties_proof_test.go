@@ -50,6 +50,8 @@ func TestKittiesProof(t *testing.T) {
 	// genes   uint256 :  626837621154801616088980922659877168609154386318304496692374110716999053
 	kitty1Slot := GetSlotForArrayItem(slotIndexForKitties, 1, 2)
 
+	fmt.Println(fmt.Sprintf("kitty1 's data is stored at slot: %x", kitty1Slot))
+
 	kitty1GenesProof, err := RequestEthGetProof(
 		ckContractAddress,
 		[]hexutil.Bytes{kitty1Slot[:]},
