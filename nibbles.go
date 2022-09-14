@@ -67,9 +67,7 @@ func ToPrefixed(ns []Nibble, isLeafNode bool) []Nibble {
 	// append prefix to all nibble bytes
 	prefixed := make([]Nibble, 0, len(prefixBytes)+len(ns))
 	prefixed = append(prefixed, prefixBytes...)
-	for _, n := range ns {
-		prefixed = append(prefixed, Nibble(n))
-	}
+	prefixed = append(prefixed, ns...)
 
 	// update prefix if is leaf node
 	if isLeafNode {
