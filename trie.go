@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 type Trie struct {
 	root Node
 }
@@ -170,8 +172,10 @@ func (t *Trie) Put(key []byte, value []byte) {
 					nodeBranchNibble, nodeLeafNibbles := nibbles[matched], nibbles[matched+1:]
 					remainingLeaf := NewLeafNodeFromNibbles(nodeLeafNibbles, value)
 					branch.SetBranch(nodeBranchNibble, remainingLeaf)
-				} else {
+				} else if matched == len(nibbles) {
 					branch.SetValue(value)
+				} else {
+					panic(fmt.Sprintf("too many matched (%v > %v)", matched, len(nibbles)))
 				}
 
 				// if there is no shared extension nibbles any more, then we don't need the extension node
