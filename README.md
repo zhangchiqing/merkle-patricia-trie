@@ -346,7 +346,7 @@ And now the root node is pointing to the new BranchNode.
 
 ### Adding the 3rd transaction
 
-Adding the 3rd transaction will turn the LeafNode on the right side to be a BranchNode, similar to the process of adding the 2nd transaction. Although the root node didn't change, its root hash has been changed, because it's `0` branch is pointing to a different node with different hashes.
+Adding the 3rd transaction will turn the LeafNode on the left side to be a BranchNode, similar to the process of adding the 2nd transaction. Although the root node didn't change, its root hash has been changed, because it's `0` branch is pointing to a different node with different hashes.
 
 ![adding the third transaction to the trie](/diagrams/3_add_3rd_tx.png)
 
